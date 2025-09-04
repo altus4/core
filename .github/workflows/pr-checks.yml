@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
 
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
     steps:
       - name: Check PR size
         uses: actions/github-script@v7
@@ -40,27 +45,42 @@ jobs:
             }
 
             // Add label
-            github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: [label]
-            });
-
-            // Add comment if large
-            if (changes > 200) {
-              github.rest.issues.createComment({
+            try {
+              await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: message
+                labels: [label]
               });
+              console.log(`Added label: ${label}`);
+            } catch (error) {
+              console.error('Failed to add label:', error.message);
+            }
+
+            // Add comment if large
+            if (changes > 200) {
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: message
+                });
+                console.log('Added PR size comment');
+              } catch (error) {
+                console.error('Failed to add comment:', error.message);
+              }
             }
 
   title-check:
     name: PR Title Check
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
+
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
 
     steps:
       - name: Check PR title format
@@ -72,27 +92,32 @@ jobs:
 
             if (!conventionalCommitRegex.test(title)) {
               const comment = `## PR Title Format
-              
+
               ⚠️ **PR title should follow conventional commit format**
-              
+
               **Current title:** \`${title}\`
-              
+
               **Expected format:** \`type(scope): description\`
-              
+
               **Examples:**
               - \`feat(search): add semantic search capabilities\`
               - \`fix(auth): resolve JWT token expiration issue\`
               - \`docs(api): update search endpoint documentation\`
-              
+
               **Valid types:** feat, fix, docs, style, refactor, perf, test, chore, ci, build
               `;
-              
-              github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: comment
-              });
-              
+
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment
+                });
+                console.log('Added PR title format comment');
+              } catch (error) {
+                console.error('Failed to add comment:', error.message);
+              }
+
               core.setFailed('PR title does not follow conventional commit format');
             }

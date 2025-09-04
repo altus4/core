@@ -12,6 +12,11 @@ jobs:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
 
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
     services:
       mysql:
         image: mysql:8.0
@@ -79,10 +84,15 @@ jobs:
               ${results.avgResponseTime > 200 ? '⚠️ **Warning**: Response times are higher than expected' : ''}
               `;
 
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: body
+                });
+                console.log('Added performance results comment');
+              } catch (error) {
+                console.error('Failed to add performance comment:', error.message);
+              }
             }

@@ -11,6 +11,11 @@ jobs:
     name: Auto Assign Issues and PRs
     runs-on: ubuntu-latest
 
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
     steps:
       - name: Auto assign
         uses: actions/github-script@v7
@@ -23,58 +28,68 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: context.issue.number,
               });
-              
+
               let assignees = ['jerome']; // Default assignee
-              
+
               // Check for specific file patterns
-              const hasSecurityFiles = files.some(file => 
-                file.filename.includes('auth') || 
-                file.filename.includes('security') || 
+              const hasSecurityFiles = files.some(file =>
+                file.filename.includes('auth') ||
+                file.filename.includes('security') ||
                 file.filename.includes('encryption')
               );
-              
-              const hasDbFiles = files.some(file => 
-                file.filename.includes('database') || 
-                file.filename.includes('mysql') || 
+
+              const hasDbFiles = files.some(file =>
+                file.filename.includes('database') ||
+                file.filename.includes('mysql') ||
                 file.filename.includes('migration')
               );
-              
-              const hasCiFiles = files.some(file => 
-                file.filename.includes('.github') || 
+
+              const hasCiFiles = files.some(file =>
+                file.filename.includes('.github') ||
                 file.filename.includes('workflow')
               );
-              
+
               // Add appropriate labels
               let labels = [];
               if (hasSecurityFiles) labels.push('security');
               if (hasDbFiles) labels.push('database');
               if (hasCiFiles) labels.push('ci/cd');
-              
+
               if (labels.length > 0) {
-                github.rest.issues.addLabels({
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number,
+                    labels: labels
+                  });
+                  console.log(`Added labels: ${labels.join(', ')}`);
+                } catch (error) {
+                  console.error('Failed to add labels:', error.message);
+                }
+              }
+
+              // Assign to PR
+              try {
+                await github.rest.issues.addAssignees({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  labels: labels
+                  assignees: assignees
                 });
+                console.log(`Assigned to: ${assignees.join(', ')}`);
+              } catch (error) {
+                console.error('Failed to assign PR:', error.message);
               }
-              
-              // Assign to PR
-              github.rest.issues.addAssignees({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                assignees: assignees
-              });
             }
 
             // Auto-assign issues based on labels or content
             if (context.eventName === 'issues') {
-              const issueBody = context.payload.issue.body.toLowerCase();
-              const issueTitle = context.payload.issue.title.toLowerCase();
-              
+              const issueBody = (context.payload.issue.body || '').toLowerCase();
+              const issueTitle = (context.payload.issue.title || '').toLowerCase();
+
               let labels = [];
-              
+
               // Auto-label based on content
               if (issueBody.includes('search') || issueTitle.includes('search')) {
                 labels.push('search-engine');
@@ -88,21 +103,31 @@ jobs:
               if (issueBody.includes('performance') || issueBody.includes('slow')) {
                 labels.push('performance');
               }
-              
+
               if (labels.length > 0) {
-                github.rest.issues.addLabels({
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number,
+                    labels: labels
+                  });
+                  console.log(`Added labels: ${labels.join(', ')}`);
+                } catch (error) {
+                  console.error('Failed to add labels:', error.message);
+                }
+              }
+
+              // Assign to maintainer
+              try {
+                await github.rest.issues.addAssignees({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.issue.number,
-                  labels: labels
+                  assignees: ['jerome']
                 });
+                console.log('Assigned issue to: jerome');
+              } catch (error) {
+                console.error('Failed to assign issue:', error.message);
               }
-              
-              // Assign to maintainer
-              github.rest.issues.addAssignees({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                assignees: ['jerome']
-              });
             }
