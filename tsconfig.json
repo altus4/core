@@ -25,15 +25,11 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/config/*": ["src/config/*"],
-      "@/controllers/*": ["src/controllers/*"],
-      "@/services/*": ["src/services/*"],
-      "@/models/*": ["src/models/*"],
-      "@/middleware/*": ["src/middleware/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/types/*": ["src/types/*"],
       "@tests/*": ["tests/*"]
     }
+  },
+  "ts-node": {
+    "require": ["tsconfig-paths/register", "dotenv/config"]
   },
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]

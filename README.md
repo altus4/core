@@ -782,6 +782,28 @@ We welcome contributions to Altus 4! Please follow these guidelines:
 4. **Install dependencies**: `npm install`
 5. **Set up development environment** following the Installation guide
 
+### Local Development with Docker
+
+For easy local development, we provide Docker-based scripts that automatically set up MySQL and Redis services:
+
+#### Quick Start (Recommended)
+
+```bash
+# Start all services (MySQL + Redis) with automatic migrations
+./script/local/start.sh
+
+# Start the Node.js server
+npm run dev
+```
+
+#### Available Scripts
+
+| Script                    | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `./script/local/start.sh` | Start MySQL and Redis containers, run database migrations |
+| `./script/local/stop.sh`  | Stop all containers (data preserved)                      |
+| `./script/local/reset.sh` | Stop containers and remove all data (fresh start)         |
+
 ### Contribution Workflow
 
 1. **Create an issue** describing the feature or bug
