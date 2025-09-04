@@ -28,7 +28,7 @@ Get Altus 4 running in 5 minutes:
 
 ```bash
 # Clone and install
-git clone https://github.com/yourusername/altus4.git
+git clone https://github.com/altus4/core.git
 cd altus4 && npm install
 
 # Setup environment
@@ -215,7 +215,7 @@ Before installing Altus 4, ensure you have the following dependencies:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/altus4.git
+git clone https://github.com/altus4/core.git
 cd altus4
 
 # Install dependencies
@@ -829,8 +829,8 @@ This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE
 ### Getting Help
 
 - **Documentation**: Check this README and inline code documentation
-- **Issues**: Report bugs and request features on [GitHub Issues](https://github.com/yourusername/altus4/issues)
-- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/yourusername/altus4/discussions)
+- **Issues**: Report bugs and request features on [GitHub Issues](https://github.com/altus4/core/issues)
+- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/altus4/core/discussions)
 
 ### Commercial Support
 
@@ -841,9 +841,9 @@ For enterprise support, custom development, or consulting services, please conta
 
 ### Community
 
-- **GitHub**: <https://github.com/yourusername/altus4>
+- **GitHub**: <https://github.com/altus4/core>
 - **Documentation**: <https://docs.altus4.dev>
-- **Changelog**: <https://github.com/yourusername/altus4/releases>
+- **Changelog**: <https://github.com/altus4/core/releases>
 
 ---
 
