@@ -15,6 +15,14 @@
   },
   "plugins": ["@typescript-eslint", "prettier", "unused-imports"],
   "rules": {
+    "semi": ["error", "always"],
+    "quotes": [
+      "error",
+      "single",
+      {
+        "avoidEscape": true
+      }
+    ],
     "prettier/prettier": "error",
     "prefer-const": "error",
     "no-var": "error",

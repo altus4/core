@@ -128,7 +128,7 @@ describe('API Key Auth Middleware', () => {
           rateLimitCustom: { requests: 50000, window: 3600 },
         };
         mockReq.headers = {
-          authorization: `Bearer altus4_sk_live_enterprise123def456ghi789jkl012mno345pqr678stu`,
+          authorization: 'Bearer altus4_sk_live_enterprise123def456ghi789jkl012mno345pqr678stu',
         };
         mockValidateApiKey.mockResolvedValue({
           apiKey: enterpriseKey,

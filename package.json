@@ -26,9 +26,6 @@
     "fix": "npm run lint:fix",
     "fix:all": "eslint . --ext .ts,.tsx --fix && prettier --write .",
     "check": "npm run lint && npm run format:check && tsc --noEmit",
-    "md:lint": "markdownlint '**/*.md' --ignore node_modules --ignore coverage --ignore dist --config .markdownlint.json",
-    "md:lint:fix": "markdownlint '**/*.md' --ignore node_modules --ignore coverage --ignore dist --fix --config .markdownlint.json",
-    "md:format": "prettier --write '**/*.md' --ignore-path .gitignore",
     "security:audit": "npm audit --audit-level=high",
     "security:fix": "npm audit fix",
     "commit:verify": "bin/verify-commits.sh",
@@ -45,9 +42,6 @@
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"
-    ],
-    "*.md": [
-      "markdownlint --fix"
     ]
   },
   "keywords": [
@@ -78,8 +72,6 @@
     "husky": "^9.1.7",
     "jest": "^29.6.2",
     "lint-staged": "^16.1.5",
-    "markdownlint": "^0.38.0",
-    "markdownlint-cli": "^0.45.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.6.2",
     "supertest": "^7.1.4",

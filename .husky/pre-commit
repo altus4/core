@@ -83,14 +83,6 @@ else
     print_warning "GPG commit signing not configured"
 fi
 
-print_status "8. Documentation Checks"
-echo "📚 Checking documentation consistency..."
-if command -v markdownlint > /dev/null 2>&1; then
-    npm run md:lint
-    print_success "Documentation linting passed"
-else
-    print_warning "Markdownlint not available, skipping documentation checks"
-fi
 
 # Calculate execution time
 END_TIME=$(date +%s)

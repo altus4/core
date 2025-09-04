@@ -288,7 +288,7 @@ export class DatabaseService {
 
         for (const column of columns) {
           const [results] = await connection.execute<RowDataPacket[]>(
-            `SELECT DISTINCT ?? FROM ?? WHERE ?? LIKE ? LIMIT ?`,
+            'SELECT DISTINCT ?? FROM ?? WHERE ?? LIKE ? LIMIT ?',
             [column, table, column, `%${partialQuery}%`, limit]
           );
 
