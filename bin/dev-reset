@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience script to reset development environment
+exec "$(dirname "$0")/dev/reset.sh" "$@"

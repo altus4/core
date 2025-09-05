@@ -5,6 +5,105 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-09-05
+
+### Added
+
+#### **Docker Development Environment**
+
+- **One-command development setup** - `npm run dev:start` now starts complete Docker environment with MySQL 8.0 and Redis 7
+- **Automatic database setup** - Docker environment creates `altus4` database and runs all migrations automatically
+- **Health check integration** - Waits for MySQL and Redis to be healthy before proceeding
+- **Docker Compose configuration** - Complete `bin/dev/docker-compose.yml` with proper networking and volumes
+- **Environment reset capability** - `npm run dev:reset` for clean slate development environment
+
+#### **Organized Script Structure**
+
+- **Categorized bin directory** - Reorganized all scripts into logical categories:
+  - `bin/dev/` - Development environment (Docker, startup, shutdown)
+  - `bin/db/` - Database operations (migrations, status)
+  - `bin/security/` - Security tools (GPG, JWT, commit verification)
+  - `bin/test/` - Testing utilities (Git hooks testing)
+- **Convenience scripts** - Root-level shortcuts (`dev-start`, `dev-stop`, `dev-reset`, `migrate`) for common operations
+- **Comprehensive script documentation** - `bin/README.md` with usage examples and organization guide
+
+#### **Enhanced npm Scripts**
+
+- **Development environment scripts** - `dev:start`, `dev:stop`, `dev:reset`, `dev:logs` for Docker management
+- **Quality assurance scripts** - `typecheck`, `check`, `validate`, `fix` for comprehensive code quality
+- **Testing scripts** - `test:all`, `test:integration`, `test:performance` for complete test coverage
+- **Security scripts** - `security:*` namespace for all security-related operations
+- **Consistent naming conventions** - All scripts follow `category:action` pattern for clarity
+
+#### **Database Schema Enhancements**
+
+- **New migration 006** - `database_connections` table for user database management
+- **New migration 007** - `search_analytics` table for enhanced analytics tracking
+- **Improved migration system** - Better status reporting and rollback capabilities
+- **Empty password support** - Proper handling of local MySQL root user with empty password
+
+### Changed
+
+#### **Build System Improvements**
+
+- **TypeScript path alias resolution** - Integrated `tsc-alias` for proper path transformation in production builds
+- **Production environment loading** - `npm start` now automatically loads `.env` file with `dotenv/config`
+- **Build script enhancement** - `npm run build` now runs `tsc && tsc-alias` for complete compilation
+- **Module resolution fixes** - All `@/` path aliases correctly transformed to relative paths in dist/
+
+#### **API Authentication System**
+
+- **Fixed JSON parsing issue** - Resolved MySQL JSON field auto-parsing conflict in `ApiKeyService.validateApiKey`
+- **Working test credentials** - Added pre-configured test user (`postman@example.com` / `postman123`) for immediate testing
+- **Complete authentication flow** - End-to-end testing from registration to API key usage
+- **API endpoint versioning** - All endpoints now correctly use `/api/v1/` prefix throughout documentation
+
+#### **Environment Configuration**
+
+- **Simplified database setup** - Default configuration uses `root` user with empty password for local development
+- **Database name standardization** - Changed from `altus4_meta` to `altus4` for consistency
+- **Optional environment variables** - Proper handling of empty `DB_PASSWORD` for local MySQL setups
+- **Rate limiting configuration** - Temporarily disabled for testing with high limits and short durations
+
+#### **Documentation Overhaul**
+
+- **Complete API documentation update** - All endpoints updated to use `/api/v1/` prefix across all documentation files
+- **Docker setup documentation** - Added comprehensive Docker environment setup guides
+- **npm scripts documentation** - Complete reference for all available scripts organized by category
+- **Quick start improvements** - Updated with Docker-first approach and simplified setup steps
+- **Working examples** - All API examples tested and verified with actual working credentials
+
+### Fixed
+
+#### **API Key Authentication**
+
+- **MySQL JSON field handling** - Fixed automatic JSON parsing conflict in API key validation
+- **Database column mapping** - Corrected `password_encrypted` to `password` column name in database operations
+- **Connection status enum** - Fixed `'active'` to `'connected'` status value alignment
+- **API key validation flow** - Complete end-to-end authentication now working properly
+
+#### **Database Operations**
+
+- **Missing table creation** - Added migrations for `database_connections` and `search_analytics` tables
+- **Migration path resolution** - Fixed script paths after bin directory reorganization
+- **Environment variable validation** - Proper handling of optional database password configuration
+- **Connection testing** - Database connection validation now works with empty passwords
+
+#### **Rate Limiting Issues**
+
+- **Development testing** - Temporarily disabled rate limiting for comprehensive endpoint testing
+- **Redis integration** - Fixed rate limiter configuration for development environment
+- **Authentication endpoints** - Resolved rate limit blocking during authentication testing
+
+#### **Script Organization**
+
+- **Path resolution** - Updated all script internal paths after reorganization
+- **Permission handling** - Removed runtime `chmod` commands, scripts are pre-executable
+- **Cross-references** - Fixed all script cross-references and npm script mappings
+- **Documentation alignment** - All script documentation updated to reflect new organization
+
+---
+
 ## [0.2.0] - 2024-01-15
 
 ### Added

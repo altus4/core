@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience script to start development environment
+exec "$(dirname "$0")/dev/start.sh" "$@"

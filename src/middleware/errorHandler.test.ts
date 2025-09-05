@@ -115,7 +115,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -137,7 +137,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -162,7 +162,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -187,7 +187,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -212,7 +212,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -235,7 +235,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -259,7 +259,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -281,7 +281,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -305,7 +305,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -327,7 +327,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -356,7 +356,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -380,7 +380,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -459,7 +459,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -476,7 +476,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'unknown',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -526,7 +526,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });
@@ -551,7 +551,7 @@ describe('Error Handler Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.0',
+          version: '0.2.1',
         },
       });
     });

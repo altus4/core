@@ -25,7 +25,7 @@ const addConnectionSchema = z.object({
   port: z.number().min(1).max(65535).default(3306),
   database: z.string().min(1, 'Database name is required'),
   username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string(), // Allow empty passwords for local development
   ssl: z.boolean().default(false),
 });
 
@@ -35,7 +35,7 @@ const updateConnectionSchema = z.object({
   port: z.number().min(1).max(65535).optional(),
   database: z.string().min(1).optional(),
   username: z.string().min(1).optional(),
-  password: z.string().min(1).optional(),
+  password: z.string().optional(), // Allow empty passwords for local development
   ssl: z.boolean().optional(),
 });
 

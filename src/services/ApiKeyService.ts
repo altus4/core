@@ -197,10 +197,14 @@ export class ApiKeyService {
         keyPrefix: keyData.key_prefix,
         name: keyData.name,
         environment: keyData.environment,
-        permissions: JSON.parse(keyData.permissions || '["search"]'),
+        permissions: Array.isArray(keyData.permissions)
+          ? keyData.permissions
+          : JSON.parse(keyData.permissions || '["search"]'),
         rateLimitTier: keyData.rate_limit_tier,
         rateLimitCustom: keyData.rate_limit_custom
-          ? JSON.parse(keyData.rate_limit_custom)
+          ? typeof keyData.rate_limit_custom === 'object'
+            ? keyData.rate_limit_custom
+            : JSON.parse(keyData.rate_limit_custom)
           : undefined,
         expiresAt: keyData.expires_at ? new Date(keyData.expires_at) : undefined,
         lastUsed: new Date(),

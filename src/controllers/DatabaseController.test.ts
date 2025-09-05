@@ -1,8 +1,8 @@
-import { DatabaseController } from './DatabaseController';
 import { DatabaseService } from '@/services/DatabaseService';
-import { EncryptionUtil } from '@/utils/encryption';
 import type { DatabaseConnection, TableSchema } from '@/types';
+import { EncryptionUtil } from '@/utils/encryption';
 import { createConnection } from 'mysql2/promise';
+import { DatabaseController } from './DatabaseController';
 
 // Mock dependencies
 jest.mock('@/services/DatabaseService');
@@ -209,7 +209,7 @@ describe('DatabaseController', () => {
           true,
           expect.any(Date),
           expect.any(Date),
-          'active',
+          'connected',
         ])
       );
       expect(mockDatabaseService.addConnection).toHaveBeenCalled();

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Convenience script to stop development environment
+exec "$(dirname "$0")/dev/stop.sh" "$@"

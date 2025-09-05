@@ -3,13 +3,13 @@
 # Usage: ./bin/migrate.sh [up|down|status]
 
 # Load environment variables if .env file exists
-if [ -f "$(dirname "$0")/../.env" ]; then
+if [ -f "$(dirname "$0")/../../.env" ]; then
   set -a
-  source "$(dirname "$0")/../.env"
+  source "$(dirname "$0")/../../.env"
   set +a
 fi
 
-MIGRATIONS_DIR="$(dirname "$0")/../migrations"
+MIGRATIONS_DIR="$(dirname "$0")/../../migrations"
 
 # Use environment variables with fallbacks for backward compatibility
 DB_HOST="${DB_HOST:-localhost}"
