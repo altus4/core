@@ -35,8 +35,8 @@ describe('Config Module', () => {
       // These should be defined even if empty
       expect(config.database.password).toBeDefined();
       expect(config.openai.apiKey).toBeDefined();
-      // Redis password can be undefined
-      expect(config.redis.password).toBeDefined();
+      // Redis password can be undefined when REDIS_PASSWORD env var is not set
+      expect(config.redis.password).toEqual(process.env.REDIS_PASSWORD);
     });
   });
 
