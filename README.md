@@ -179,7 +179,7 @@ Altus 4 follows a layered architecture pattern with four primary components:
 
 ### Technology Stack
 
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 20+
 - **Language**: TypeScript with strict type checking
 - **Framework**: Express.js with comprehensive middleware
 - **Database**: MySQL 8.0+ for both client data and metadata storage
@@ -196,7 +196,7 @@ Before installing Altus 4, ensure you have the following dependencies:
 
 ### Required Software
 
-- **Node.js**: Version 18.0 or higher
+- **Node.js**: Version 20.0 or higher
 - **npm**: Version 8.0 or higher (or yarn/pnpm equivalent)
 - **MySQL**: Version 8.0 or higher
 - **Redis**: Version 6.0 or higher
