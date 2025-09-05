@@ -50,7 +50,7 @@ done
 
 # Run migrations using Docker container
 echo "🚀 Executing migrations..."
-for migration_file in ../../migrations/*.up.sql; do
+for migration_file in ../../../migrations/*.up.sql; do
   if [ -f "$migration_file" ]; then
     echo "Running migration: $(basename "$migration_file")"
     docker-compose exec -T mysql mysql -h localhost -u altus4_user -pyour_secure_password_here altus4_metadata < "$migration_file"

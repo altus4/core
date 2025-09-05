@@ -31,16 +31,19 @@ Get Altus 4 running in 5 minutes:
 git clone https://github.com/altus4/core.git
 cd altus4 && npm install
 
-# Setup environment
-cp .env.example .env
-# Edit .env with your MySQL/Redis credentials
-
-# Run database migrations
-npm run migrate
-
-# Start development server
-npm run dev
+# Option 1: Full Docker Environment (Recommended)
+npm run dev:start        # Starts MySQL + Redis + runs migrations
+npm run dev              # Start the application
 # Server starts at http://localhost:3000
+
+# Option 2: Manual Setup
+cp .env.example .env     # Setup environment
+# Edit .env with your MySQL/Redis credentials
+npm run migrate          # Run database migrations
+npm run dev              # Start development server
+
+# When done developing
+npm run dev:stop         # Stop Docker services
 ```
 
 ## Database Migrations
@@ -90,13 +93,13 @@ You can also run the migration script directly:
 
 ```bash
 # Apply all migrations
-./bin/migrate.sh up
+./bin/migrate up
 
 # Revert all migrations
-./bin/migrate.sh down
+./bin/migrate down
 
 # Show detailed migration status
-./bin/migrate.sh status
+./bin/migrate status
 ```
 
 **Note:** Ensure your database exists before running migrations. The migration system will not create the database automatically.

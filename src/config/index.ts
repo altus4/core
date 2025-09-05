@@ -2,13 +2,10 @@ import type { AppConfig } from '@/types';
 
 const isTestEnvironment = process.env.NODE_ENV === 'test';
 
-const requiredEnvVars = [
-  'JWT_SECRET',
-  'DB_HOST',
-  'DB_USERNAME',
-  'DB_PASSWORD',
-  'DB_DATABASE',
-] as const;
+const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'] as const;
+
+// DB_PASSWORD can be empty for local development
+const optionalEnvVars = ['DB_PASSWORD'] as const;
 
 // In test environment, provide defaults to avoid strict validation
 if (isTestEnvironment) {
@@ -26,6 +23,13 @@ if (!isTestEnvironment) {
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
+
+  // Ensure optional variables are defined (can be empty)
+  optionalEnvVars.forEach(envVar => {
+    if (process.env[envVar] === undefined) {
+      process.env[envVar] = '';
+    }
+  });
 }
 
 export const config: AppConfig = {

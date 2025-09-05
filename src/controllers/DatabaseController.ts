@@ -158,7 +158,7 @@ export class DatabaseController {
 
       await conn.execute(
         `INSERT INTO database_connections
-         (id, user_id, name, host, port, database_name, username, password_encrypted,
+         (id, user_id, name, host, port, database_name, username, password,
           ssl_enabled, is_active, created_at, updated_at, connection_status)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -174,7 +174,7 @@ export class DatabaseController {
           true,
           now,
           now,
-          'active',
+          'connected',
         ]
       );
 
