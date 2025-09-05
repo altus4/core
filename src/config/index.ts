@@ -2,6 +2,26 @@ import type { AppConfig } from '@/types';
 
 const isTestEnvironment = process.env.NODE_ENV === 'test';
 
+// Helper function to parse integer with default
+export const parseIntWithDefault = (value: string | undefined, defaultValue: number): number => {
+  return parseInt(value || defaultValue.toString(), 10);
+};
+
+// Helper function to get environment-specific JWT minimum length
+export const getJwtMinLength = (isTestEnv: boolean): number => {
+  return isTestEnv ? 16 : 32;
+};
+
+// Helper function to validate port range
+export const isValidPort = (port: number): boolean => {
+  return port >= 1 && port <= 65535;
+};
+
+// Helper function to validate environment
+export const isValidEnvironment = (env: string): boolean => {
+  return ['development', 'production', 'test'].includes(env);
+};
+
 const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'] as const;
 
 // DB_PASSWORD can be empty for local development
@@ -33,13 +53,13 @@ if (!isTestEnvironment) {
 }
 
 export const config: AppConfig = {
-  port: parseInt(process.env.PORT || '3000', 10),
+  port: parseIntWithDefault(process.env.PORT, 3000),
   environment: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
   jwtSecret: process.env.JWT_SECRET!,
 
   database: {
     host: process.env.DB_HOST!,
-    port: parseInt(process.env.DB_PORT || '3306', 10),
+    port: parseIntWithDefault(process.env.DB_PORT, 3306),
     username: process.env.DB_USERNAME!,
     password: process.env.DB_PASSWORD!,
     database: process.env.DB_DATABASE!,
@@ -47,7 +67,7 @@ export const config: AppConfig = {
 
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    port: parseIntWithDefault(process.env.REDIS_PORT, 6379),
     password: process.env.REDIS_PASSWORD,
   },
 
@@ -57,24 +77,24 @@ export const config: AppConfig = {
   },
 
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+    windowMs: parseIntWithDefault(process.env.RATE_LIMIT_WINDOW_MS, 900000), // 15 minutes
+    maxRequests: parseIntWithDefault(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
   },
 };
 
 // Validate configuration
 export const validateConfig = (): void => {
-  if (config.port < 1 || config.port > 65535) {
+  if (!isValidPort(config.port)) {
     throw new Error('PORT must be between 1 and 65535');
   }
 
   // Be more lenient with JWT secret in test environment
-  const minJwtLength = isTestEnvironment ? 16 : 32;
+  const minJwtLength = getJwtMinLength(isTestEnvironment);
   if (config.jwtSecret.length < minJwtLength) {
     throw new Error(`JWT_SECRET must be at least ${minJwtLength} characters long`);
   }
 
-  if (!['development', 'production', 'test'].includes(config.environment)) {
+  if (!isValidEnvironment(config.environment)) {
     throw new Error('NODE_ENV must be one of: development, production, test');
   }
 };

@@ -702,4 +702,503 @@ describe('CacheService', () => {
       expect(mockRedisInstance.del).toHaveBeenCalledWith('session:user123');
     });
   });
+
+  describe('setex', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should call set with TTL', async () => {
+      // Arrange
+      const testData = { name: 'test', value: 123 };
+      mockRedisInstance.setex.mockResolvedValue('OK' as any);
+
+      // Act
+      await cacheService.setex('test-key', 300, testData);
+
+      // Assert
+      expect(mockRedisInstance.setex).toHaveBeenCalledWith(
+        'test-key',
+        300,
+        JSON.stringify(testData)
+      );
+    });
+  });
+
+  describe('getTopQueries', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should get cached top queries', async () => {
+      // Arrange
+      const topQueries = ['query1', 'query2', 'query3'];
+      mockRedisInstance.get.mockResolvedValue(JSON.stringify(topQueries));
+
+      // Act
+      const result = await cacheService.getTopQueries('user123', 7);
+
+      // Assert
+      expect(result).toEqual(topQueries);
+      expect(mockRedisInstance.get).toHaveBeenCalledWith('top_queries:user123:7d');
+    });
+
+    it('should return empty array when no cached data', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(null);
+
+      // Act
+      const result = await cacheService.getTopQueries('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when cache is not available', async () => {
+      // Arrange
+      const disconnectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'disconnect'
+      )?.[1];
+      disconnectHandler?.();
+
+      // Act
+      const result = await cacheService.getTopQueries('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis error'));
+
+      // Act
+      const result = await cacheService.getTopQueries('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key top_queries:user123:7d:',
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe('getQueryVolume', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should get cached query volume', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(JSON.stringify(150));
+
+      // Act
+      const result = await cacheService.getQueryVolume('user123', 7);
+
+      // Assert
+      expect(result).toBe(150);
+      expect(mockRedisInstance.get).toHaveBeenCalledWith('query_volume:user123:7d');
+    });
+
+    it('should return 0 when no cached data', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(null);
+
+      // Act
+      const result = await cacheService.getQueryVolume('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 when cache is not available', async () => {
+      // Arrange
+      const disconnectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'disconnect'
+      )?.[1];
+      disconnectHandler?.();
+
+      // Act
+      const result = await cacheService.getQueryVolume('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis error'));
+
+      // Act
+      const result = await cacheService.getQueryVolume('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key query_volume:user123:7d:',
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe('getAverageResponseTime', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should get cached average response time', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(JSON.stringify(245.5));
+
+      // Act
+      const result = await cacheService.getAverageResponseTime('user123', 7);
+
+      // Assert
+      expect(result).toBe(245.5);
+      expect(mockRedisInstance.get).toHaveBeenCalledWith('avg_response_time:user123:7d');
+    });
+
+    it('should return 0 when no cached data', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(null);
+
+      // Act
+      const result = await cacheService.getAverageResponseTime('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+    });
+
+    it('should return 0 when cache is not available', async () => {
+      // Arrange
+      const disconnectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'disconnect'
+      )?.[1];
+      disconnectHandler?.();
+
+      // Act
+      const result = await cacheService.getAverageResponseTime('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis error'));
+
+      // Act
+      const result = await cacheService.getAverageResponseTime('user123', 7);
+
+      // Assert
+      expect(result).toBe(0);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key avg_response_time:user123:7d:',
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe('getPopularCategories', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should get cached popular categories', async () => {
+      // Arrange
+      const categories = ['database', 'optimization', 'performance'];
+      mockRedisInstance.get.mockResolvedValue(JSON.stringify(categories));
+
+      // Act
+      const result = await cacheService.getPopularCategories('user123', 7);
+
+      // Assert
+      expect(result).toEqual(categories);
+      expect(mockRedisInstance.get).toHaveBeenCalledWith('popular_categories:user123:7d');
+    });
+
+    it('should return empty array when no cached data', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(null);
+
+      // Act
+      const result = await cacheService.getPopularCategories('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when cache is not available', async () => {
+      // Arrange
+      const disconnectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'disconnect'
+      )?.[1];
+      disconnectHandler?.();
+
+      // Act
+      const result = await cacheService.getPopularCategories('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis error'));
+
+      // Act
+      const result = await cacheService.getPopularCategories('user123', 7);
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key popular_categories:user123:7d:',
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe('getSearchHistory', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should get cached search history', async () => {
+      // Arrange
+      const searchHistory = [
+        { userId: 'user123', query: 'database', resultCount: 10, executionTime: 150 },
+        { userId: 'user123', query: 'optimization', resultCount: 5, executionTime: 80 },
+      ];
+      mockRedisInstance.get.mockResolvedValue(JSON.stringify(searchHistory));
+
+      // Act
+      const result = await cacheService.getSearchHistory('user123', 10, 0);
+
+      // Assert
+      expect(result).toEqual(searchHistory);
+      expect(mockRedisInstance.get).toHaveBeenCalledWith('search_history:user123:10:0');
+    });
+
+    it('should return empty array when no cached data', async () => {
+      // Arrange
+      mockRedisInstance.get.mockResolvedValue(null);
+
+      // Act
+      const result = await cacheService.getSearchHistory('user123', 10, 0);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array when cache is not available', async () => {
+      // Arrange
+      const disconnectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'disconnect'
+      )?.[1];
+      disconnectHandler?.();
+
+      // Act
+      const result = await cacheService.getSearchHistory('user123', 10, 0);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis error'));
+
+      // Act
+      const result = await cacheService.getSearchHistory('user123', 10, 0);
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key search_history:user123:10:0:',
+        expect.any(Error)
+      );
+    });
+  });
+
+  describe('error handling', () => {
+    beforeEach(() => {
+      cacheService = new CacheService();
+      // Simulate connection
+      const connectHandler = mockRedisInstance.on.mock.calls.find(
+        call => call[0] === 'connect'
+      )?.[1];
+      connectHandler?.();
+    });
+
+    it('should handle Redis errors in del method', async () => {
+      // Arrange
+      mockRedisInstance.del.mockRejectedValue(new Error('Redis del error'));
+
+      // Act
+      await cacheService.del('test-key');
+
+      // Assert
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache delete error for key test-key:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in incr method', async () => {
+      // Arrange
+      mockRedisInstance.incr.mockRejectedValue(new Error('Redis incr error'));
+
+      // Act
+      const result = await cacheService.incr('test-counter');
+
+      // Assert
+      expect(result).toBe(0);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache incr error for key test-counter:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in zadd method', async () => {
+      // Arrange
+      mockRedisInstance.zadd.mockRejectedValue(new Error('Redis zadd error'));
+
+      // Act
+      await cacheService.zadd('test-set', 10, 'item1');
+
+      // Assert
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache zadd error for key test-set:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in zrevrange method', async () => {
+      // Arrange
+      mockRedisInstance.zrevrange.mockRejectedValue(new Error('Redis zrevrange error'));
+
+      // Act
+      const result = await cacheService.zrevrange('test-set', 0, 2);
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache zrevrange error for key test-set:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in getPopularQueries method', async () => {
+      // Arrange
+      mockRedisInstance.get.mockRejectedValue(new Error('Redis get error'));
+
+      // Act
+      const result = await cacheService.getPopularQueries('test');
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache get error for key popular_queries:test:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in logSearchAnalytics method', async () => {
+      // Arrange
+      mockRedisInstance.incr.mockRejectedValue(new Error('Redis analytics error'));
+
+      const analytics = {
+        userId: 'user123',
+        query: 'test',
+        resultCount: 5,
+        executionTime: 100,
+        timestamp: new Date(),
+      };
+
+      // Act
+      await cacheService.logSearchAnalytics(analytics);
+
+      // Assert
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache incr error for key query_count:user123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in setRateLimit method', async () => {
+      // Arrange
+      mockRedisInstance.incr.mockRejectedValue(new Error('Redis rate limit error'));
+
+      // Act
+      const result = await cacheService.setRateLimit('user123', 10, 3600);
+
+      // Assert
+      expect(result).toBe(true);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cache incr error for key rate_limit:user123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle Redis errors in flushAll method', async () => {
+      // Arrange
+      mockRedisInstance.flushall.mockRejectedValue(new Error('Redis flush error'));
+
+      // Act
+      await cacheService.flushAll();
+
+      // Assert
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to flush cache:', expect.any(Error));
+    });
+  });
+
+  describe('connect method', () => {
+    it('should handle connection errors gracefully', async () => {
+      // Arrange
+      mockRedisInstance.connect.mockRejectedValue(new Error('Connection failed'));
+
+      // Act
+      cacheService = new CacheService();
+
+      // Wait for async connect to complete
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // Assert
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to connect to Redis:',
+        expect.any(Error)
+      );
+    });
+  });
 });

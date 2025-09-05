@@ -364,6 +364,76 @@ describe('AIService', () => {
       expect(categories).toEqual([]);
       expect(mockLogger.error).toHaveBeenCalledWith('AI categorization failed:', expect.any(Error));
     });
+
+    it('should handle invalid JSON response from OpenAI', async () => {
+      // Arrange
+      const invalidJsonResponse = {
+        choices: [
+          {
+            message: {
+              content: 'invalid json response',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        invalidJsonResponse as any
+      );
+
+      // Act
+      const categories = await aiService.categorizeResults(mockResults);
+
+      // Assert
+      expect(categories).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI categorization response');
+    });
+
+    it('should handle non-array JSON response from OpenAI', async () => {
+      // Arrange
+      const nonArrayResponse = {
+        choices: [
+          {
+            message: {
+              content: '{"message": "not an array"}',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        nonArrayResponse as any
+      );
+
+      // Act
+      const categories = await aiService.categorizeResults(mockResults);
+
+      // Assert
+      expect(categories).toEqual([]);
+    });
+
+    it('should handle empty response content from OpenAI', async () => {
+      // Arrange
+      const emptyResponse = {
+        choices: [
+          {
+            message: {
+              content: '',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        emptyResponse as any
+      );
+
+      // Act
+      const categories = await aiService.categorizeResults(mockResults);
+
+      // Assert
+      expect(categories).toEqual([]);
+    });
   });
 
   describe('getQuerySuggestions', () => {
@@ -407,6 +477,70 @@ describe('AIService', () => {
       // Arrange
       mockConfig.openai.apiKey = '';
       aiService = new AIService();
+
+      // Act
+      const suggestions = await aiService.getQuerySuggestions('test');
+
+      // Assert
+      expect(suggestions).toEqual([]);
+    });
+
+    it('should handle invalid JSON response from OpenAI', async () => {
+      // Arrange
+      const invalidJsonResponse = {
+        choices: [
+          {
+            message: {
+              content: 'invalid json response',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        invalidJsonResponse as any
+      );
+
+      // Act
+      const suggestions = await aiService.getQuerySuggestions('test');
+
+      // Assert
+      expect(suggestions).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI suggestions response');
+    });
+
+    it('should handle API errors gracefully', async () => {
+      // Arrange
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockRejectedValue(
+        new Error('API error')
+      );
+
+      // Act
+      const suggestions = await aiService.getQuerySuggestions('test');
+
+      // Assert
+      expect(suggestions).toEqual([]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'AI query suggestions failed:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle empty response content from OpenAI', async () => {
+      // Arrange
+      const emptyResponse = {
+        choices: [
+          {
+            message: {
+              content: '',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        emptyResponse as any
+      );
 
       // Act
       const suggestions = await aiService.getQuerySuggestions('test');
@@ -627,6 +761,30 @@ describe('AIService', () => {
         'AI insights generation failed:',
         expect.any(Error)
       );
+    });
+
+    it('should handle invalid JSON response from OpenAI', async () => {
+      // Arrange
+      const invalidJsonResponse = {
+        choices: [
+          {
+            message: {
+              content: 'invalid json response',
+            },
+          },
+        ],
+      };
+
+      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+        invalidJsonResponse as any
+      );
+
+      // Act
+      const insights = await aiService.generateInsights(['test query'], 'week');
+
+      // Assert
+      expect(insights).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI insights response');
     });
   });
 });

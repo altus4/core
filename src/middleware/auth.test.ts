@@ -1,6 +1,6 @@
 import { TestHelpers } from '@tests/utils/test-helpers';
 import jwt from 'jsonwebtoken';
-import { authenticate } from './auth';
+import { authenticate, type AuthenticatedRequest, requireRole } from './auth';
 
 describe('Auth Middleware', () => {
   // Auth tests require MySQL to be running
@@ -247,6 +247,133 @@ describe('Auth Middleware', () => {
 
       expect(duration).toBeLessThan(50); // Should be very fast (< 50ms)
       expect(nextFunction).toHaveBeenCalled();
+    });
+  });
+
+  describe('requireRole', () => {
+    describe('requireRole middleware', () => {
+      it('should allow access for admin role when admin is required', async () => {
+        // Arrange
+        const mockReq = {
+          ...TestHelpers.mockRequest(),
+          user: { id: '1', email: 'admin@test.com', name: 'Admin User', role: 'admin' as const },
+        } as AuthenticatedRequest;
+        const mockRes = TestHelpers.mockResponse();
+        const nextFunction = jest.fn();
+
+        const requireAdminMiddleware = requireRole('admin');
+
+        // Act
+        requireAdminMiddleware(mockReq, mockRes, nextFunction);
+
+        // Assert
+        expect(nextFunction).toHaveBeenCalled();
+        expect(mockRes.status).not.toHaveBeenCalled();
+        expect(mockRes.json).not.toHaveBeenCalled();
+      });
+
+      it('should allow access for admin role when user role is required', async () => {
+        // Arrange
+        const mockReq = {
+          ...TestHelpers.mockRequest(),
+          user: { id: '1', email: 'admin@test.com', name: 'Admin User', role: 'admin' as const },
+        } as AuthenticatedRequest;
+        const mockRes = TestHelpers.mockResponse();
+        const nextFunction = jest.fn();
+
+        const requireUserMiddleware = requireRole('user');
+
+        // Act
+        requireUserMiddleware(mockReq, mockRes, nextFunction);
+
+        // Assert
+        expect(nextFunction).toHaveBeenCalled();
+        expect(mockRes.status).not.toHaveBeenCalled();
+        expect(mockRes.json).not.toHaveBeenCalled();
+      });
+
+      it('should allow access for user role when user is required', async () => {
+        // Arrange
+        const mockReq = {
+          ...TestHelpers.mockRequest(),
+          user: { id: '1', email: 'user@test.com', name: 'Regular User', role: 'user' as const },
+        } as AuthenticatedRequest;
+        const mockRes = TestHelpers.mockResponse();
+        const nextFunction = jest.fn();
+
+        const requireUserMiddleware = requireRole('user');
+
+        // Act
+        requireUserMiddleware(mockReq, mockRes, nextFunction);
+
+        // Assert
+        expect(nextFunction).toHaveBeenCalled();
+        expect(mockRes.status).not.toHaveBeenCalled();
+        expect(mockRes.json).not.toHaveBeenCalled();
+      });
+
+      it('should deny access for user role when admin is required', async () => {
+        // Arrange
+        const mockReq = {
+          ...TestHelpers.mockRequest(),
+          user: { id: '1', email: 'user@test.com', name: 'Regular User', role: 'user' as const },
+        } as AuthenticatedRequest;
+        const mockRes = TestHelpers.mockResponse();
+        const nextFunction = jest.fn();
+
+        const requireAdminMiddleware = requireRole('admin');
+
+        // Act
+        requireAdminMiddleware(mockReq, mockRes, nextFunction);
+
+        // Assert
+        expect(nextFunction).not.toHaveBeenCalled();
+        expect(mockRes.status).toHaveBeenCalledWith(403);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'admin role required',
+          },
+        });
+      });
+
+      it('should deny access when no user is authenticated', async () => {
+        // Arrange
+        const mockReq = {
+          ...TestHelpers.mockRequest(),
+          user: undefined,
+        } as AuthenticatedRequest;
+        const mockRes = TestHelpers.mockResponse();
+        const nextFunction = jest.fn();
+
+        const requireUserMiddleware = requireRole('user');
+
+        // Act
+        requireUserMiddleware(mockReq, mockRes, nextFunction);
+
+        // Assert
+        expect(nextFunction).not.toHaveBeenCalled();
+        expect(mockRes.status).toHaveBeenCalledWith(401);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          },
+        });
+      });
+
+      it('should create different middleware instances for different roles', () => {
+        // Act
+        const adminMiddleware = requireRole('admin');
+        const userMiddleware = requireRole('user');
+
+        // Assert
+        expect(adminMiddleware).toBeInstanceOf(Function);
+        expect(userMiddleware).toBeInstanceOf(Function);
+        expect(adminMiddleware).not.toBe(userMiddleware);
+      });
     });
   });
 });
