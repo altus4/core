@@ -2,7 +2,7 @@
   "name": "@altus4/core",
   "version": "0.2.1",
   "description": "AI-Enhanced MySQL Full-Text Search Engine",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc && tsc-alias",
-    "start": "node -r dotenv/config dist/index.js",
+    "start": "node -r dotenv/config dist/src/index.js",
     "clean": "rm -rf dist coverage .nyc_output",
     "typecheck": "tsc --noEmit",
     "test": "jest --testPathIgnorePatterns=tests/integration",

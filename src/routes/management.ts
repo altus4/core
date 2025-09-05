@@ -50,15 +50,17 @@ router.post('/setup', authenticate, async (req: AuthenticatedRequest, res) => {
       },
       user: req.user,
       apiKey: undefined,
+      get: (header: string) => req.get(header),
     };
 
     await apiKeyController.createApiKey(mockApiKeyRequest as any, res);
-  } catch (_error) {
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: {
         code: 'SETUP_FAILED',
         message: 'Failed to create initial API key',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
     } as ApiResponse);
   }
