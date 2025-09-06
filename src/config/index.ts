@@ -80,6 +80,10 @@ export const config: AppConfig = {
     windowMs: parseIntWithDefault(process.env.RATE_LIMIT_WINDOW_MS, 900000), // 15 minutes
     maxRequests: parseIntWithDefault(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
   },
+
+  timeout: {
+    openai: parseIntWithDefault(process.env.OPENAI_TIMEOUT_MS, 30000), // 30 seconds
+  },
 };
 
 // Validate configuration
@@ -129,6 +133,9 @@ OPENAI_MODEL=gpt-3.5-turbo
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000  # 15 minutes in milliseconds
 RATE_LIMIT_MAX_REQUESTS=100
+
+# Timeout Configuration
+OPENAI_TIMEOUT_MS=30000      # 30 seconds for OpenAI API calls
 
 # CORS Configuration
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001

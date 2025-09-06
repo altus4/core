@@ -239,4 +239,7 @@ export interface AppConfig {
     windowMs: number;
     maxRequests: number;
   };
+  timeout: {
+    openai: number;
+  };
 }

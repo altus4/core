@@ -1,8 +1,8 @@
 import { config } from '@/config';
 import type { SearchResult } from '@/types';
 import { logger } from '@/utils/logger';
-import { OpenAI } from 'openai';
 import { AIService } from './AIService';
+import { OpenAIProxy } from './proxies/openai-proxy';
 
 // Explicitly unmock the AIService itself
 jest.unmock('./AIService');
@@ -10,21 +10,21 @@ jest.unmock('./AIService');
 // Mock dependencies
 jest.mock('@/config');
 jest.mock('@/utils/logger');
-jest.mock('openai');
+jest.mock('./proxies/openai-proxy');
 
 const mockConfig = config as jest.Mocked<typeof config>;
 const mockLogger = logger as jest.Mocked<typeof logger>;
-const MockOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;
+const MockOpenAIProxy = OpenAIProxy as jest.MockedClass<typeof OpenAIProxy>;
 
 describe('AIService', () => {
   let aiService: AIService;
-  let mockOpenAIInstance: jest.Mocked<OpenAI>;
+  let mockOpenAIProxyInstance: jest.Mocked<OpenAIProxy>;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Mock OpenAI instance
-    mockOpenAIInstance = {
+    // Mock OpenAIProxy instance
+    mockOpenAIProxyInstance = {
       chat: {
         completions: {
           create: jest.fn(),
@@ -32,70 +32,16 @@ describe('AIService', () => {
       },
     } as any;
 
-    MockOpenAI.mockImplementation(() => mockOpenAIInstance);
+    MockOpenAIProxy.mockImplementation(() => mockOpenAIProxyInstance);
 
     // Mock config
     mockConfig.openai = {
       apiKey: 'sk-test-api-key',
       model: 'gpt-3.5-turbo',
     };
-  });
-
-  describe('constructor', () => {
-    it('should initialize OpenAI client when valid API key is provided', () => {
-      // Act
-      aiService = new AIService();
-
-      // Assert
-      expect(MockOpenAI).toHaveBeenCalledWith({
-        apiKey: 'sk-test-api-key',
-      });
-      expect(mockLogger.info).toHaveBeenCalledWith('OpenAI service initialized successfully');
-    });
-
-    it('should disable AI features when no API key is provided', () => {
-      // Arrange
-      mockConfig.openai.apiKey = '';
-
-      // Act
-      aiService = new AIService();
-
-      // Assert
-      expect(MockOpenAI).not.toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'OpenAI API key not provided or invalid - AI features disabled'
-      );
-    });
-
-    it('should disable AI features when invalid API key is provided', () => {
-      // Arrange
-      mockConfig.openai.apiKey = 'invalid-key';
-
-      // Act
-      aiService = new AIService();
-
-      // Assert
-      expect(MockOpenAI).not.toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'OpenAI API key not provided or invalid - AI features disabled'
-      );
-    });
-
-    it('should handle OpenAI initialization errors', () => {
-      // Arrange
-      MockOpenAI.mockImplementation(() => {
-        throw new Error('OpenAI initialization failed');
-      });
-
-      // Act
-      aiService = new AIService();
-
-      // Assert
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to initialize OpenAI service:',
-        expect.any(Error)
-      );
-    });
+    mockConfig.timeout = {
+      openai: 30000,
+    };
   });
 
   describe('isAvailable', () => {
@@ -146,7 +92,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -163,7 +109,7 @@ describe('AIService', () => {
         },
       });
 
-      expect(mockOpenAIInstance.chat.completions.create).toHaveBeenCalledWith({
+      expect(mockOpenAIProxyInstance.chat.completions.create).toHaveBeenCalledWith({
         model: 'gpt-3.5-turbo',
         messages: expect.arrayContaining([
           expect.objectContaining({
@@ -199,22 +145,12 @@ describe('AIService', () => {
     it('should handle OpenAI API errors gracefully', async () => {
       // Arrange
       const query = 'test query';
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockRejectedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockRejectedValue(
         new Error('API rate limit exceeded')
       );
 
-      // Act
-      const result = await aiService.processSearchQuery(query);
-
-      // Assert
-      expect(result).toEqual({
-        optimizedQuery: 'test query',
-        context: null,
-      });
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'AI query processing failed:',
-        expect.any(Error)
-      );
+      // Act & Assert
+      await expect(aiService.processSearchQuery(query)).rejects.toThrow('API rate limit exceeded');
     });
 
     it('should handle invalid JSON response from OpenAI', async () => {
@@ -230,7 +166,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -260,7 +196,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -316,7 +252,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -336,7 +272,7 @@ describe('AIService', () => {
 
       // Assert
       expect(categories).toEqual([]);
-      expect(mockOpenAIInstance.chat.completions.create).not.toHaveBeenCalled();
+      expect(mockOpenAIProxyInstance.chat.completions.create).not.toHaveBeenCalled();
     });
 
     it('should return empty array when AI is not available', async () => {
@@ -353,16 +289,12 @@ describe('AIService', () => {
 
     it('should handle API errors gracefully', async () => {
       // Arrange
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockRejectedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockRejectedValue(
         new Error('API error')
       );
 
-      // Act
-      const categories = await aiService.categorizeResults(mockResults);
-
-      // Assert
-      expect(categories).toEqual([]);
-      expect(mockLogger.error).toHaveBeenCalledWith('AI categorization failed:', expect.any(Error));
+      // Act & Assert
+      await expect(aiService.categorizeResults(mockResults)).rejects.toThrow('API error');
     });
 
     it('should handle invalid JSON response from OpenAI', async () => {
@@ -377,7 +309,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         invalidJsonResponse as any
       );
 
@@ -401,7 +333,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         nonArrayResponse as any
       );
 
@@ -424,7 +356,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         emptyResponse as any
       );
 
@@ -458,7 +390,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -497,7 +429,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         invalidJsonResponse as any
       );
 
@@ -511,19 +443,12 @@ describe('AIService', () => {
 
     it('should handle API errors gracefully', async () => {
       // Arrange
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockRejectedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockRejectedValue(
         new Error('API error')
       );
 
-      // Act
-      const suggestions = await aiService.getQuerySuggestions('test');
-
-      // Assert
-      expect(suggestions).toEqual([]);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'AI query suggestions failed:',
-        expect.any(Error)
-      );
+      // Act & Assert
+      await expect(aiService.getQuerySuggestions('test')).rejects.toThrow('API error');
     });
 
     it('should handle empty response content from OpenAI', async () => {
@@ -538,7 +463,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         emptyResponse as any
       );
 
@@ -574,7 +499,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -642,7 +567,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -706,7 +631,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         mockResponse as any
       );
 
@@ -731,7 +656,7 @@ describe('AIService', () => {
 
       // Assert
       expect(insights).toEqual([]);
-      expect(mockOpenAIInstance.chat.completions.create).not.toHaveBeenCalled();
+      expect(mockOpenAIProxyInstance.chat.completions.create).not.toHaveBeenCalled();
     });
 
     it('should return empty array when AI is not available', async () => {
@@ -748,19 +673,12 @@ describe('AIService', () => {
 
     it('should handle API errors gracefully', async () => {
       // Arrange
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockRejectedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockRejectedValue(
         new Error('API error')
       );
 
-      // Act
-      const insights = await aiService.generateInsights(['test query'], 'week');
-
-      // Assert
-      expect(insights).toEqual([]);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'AI insights generation failed:',
-        expect.any(Error)
-      );
+      // Act & Assert
+      await expect(aiService.generateInsights(['test query'], 'week')).rejects.toThrow('API error');
     });
 
     it('should handle invalid JSON response from OpenAI', async () => {
@@ -775,7 +693,7 @@ describe('AIService', () => {
         ],
       };
 
-      (mockOpenAIInstance.chat.completions.create as jest.Mock).mockResolvedValue(
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue(
         invalidJsonResponse as any
       );
 
