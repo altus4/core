@@ -5,8 +5,8 @@
  * for integration tests.
  */
 
-import mysql from 'mysql2/promise';
 import { logger } from '@/utils/logger';
+import mysql from 'mysql2/promise';
 
 export interface TestDatabaseConfig {
   host: string;
@@ -40,6 +40,7 @@ export class TestDatabase {
         database: this.config.database,
         ssl: this.config.ssl ? {} : undefined,
         multipleStatements: true,
+        charset: 'utf8mb4',
       });
 
       return this.connection;

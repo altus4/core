@@ -5,14 +5,14 @@
  * connection testing, schema discovery, and connection status checks.
  */
 
+import type { DatabaseConnection, User } from '@/types';
+import { TestHelpers } from '../utils/test-helpers';
 import type { TestServer } from './test-server';
 import {
   createAuthenticatedRequest,
   setupTestEnvironment,
   teardownTestEnvironment,
 } from './test-server';
-import { TestHelpers } from '../utils/test-helpers';
-import type { DatabaseConnection, User } from '@/types';
 
 describe('Database Integration Tests', () => {
   let server: TestServer;
@@ -42,9 +42,9 @@ describe('Database Integration Tests', () => {
         name: 'Test Database',
         host: 'localhost',
         port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
+        database: 'altus4_test',
+        username: 'root',
+        password: '',
         ssl: false,
       };
 
@@ -71,9 +71,9 @@ describe('Database Integration Tests', () => {
       const connectionData = {
         name: 'Default Port Test',
         host: 'localhost',
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
+        database: 'altus4_test',
+        username: 'root',
+        password: '',
       };
 
       const response = await authenticatedRequest
@@ -104,9 +104,9 @@ describe('Database Integration Tests', () => {
         name: 'Invalid Port Test',
         host: 'localhost',
         port: 100000, // Invalid port number
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
+        database: 'altus4_test',
+        username: 'root',
+        password: '',
       };
 
       const response = await authenticatedRequest
@@ -121,9 +121,9 @@ describe('Database Integration Tests', () => {
       const connectionData = {
         name: 'Unauthorized Test',
         host: 'localhost',
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
+        database: 'altus4_test',
+        username: 'root',
+        password: '',
       };
 
       const response = await server
@@ -166,7 +166,7 @@ describe('Database Integration Tests', () => {
     it('should only return connections for authenticated user', async () => {
       // Create another user with connections
       const otherUser = await TestHelpers.createTestUser({
-        email: 'other@example.com',
+        email: `other-${Date.now()}-${Math.random()}@example.com`,
       });
       await TestHelpers.createTestDatabaseConnection(otherUser.id, {
         name: 'Other User Connection',
@@ -209,7 +209,7 @@ describe('Database Integration Tests', () => {
 
     it('should not allow access to other users connections', async () => {
       const otherUser = await TestHelpers.createTestUser({
-        email: 'other@example.com',
+        email: `other-${Date.now()}-${Math.random()}@example.com`,
       });
       const otherConnection = await TestHelpers.createTestDatabaseConnection(otherUser.id);
 
@@ -320,7 +320,7 @@ describe('Database Integration Tests', () => {
 
     it('should not allow deletion of other users connections', async () => {
       const otherUser = await TestHelpers.createTestUser({
-        email: 'other@example.com',
+        email: `other-${Date.now()}-${Math.random()}@example.com`,
       });
       const otherConnection = await TestHelpers.createTestDatabaseConnection(otherUser.id);
 

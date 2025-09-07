@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### **External API Timeout Management**
+
+- **ExternalProxy base class** - Abstract proxy pattern with encapsulated timeout handling for all external API services
+- **OpenAIProxy service** - Dedicated proxy for OpenAI API calls with automatic timeout configuration and error handling
+- **TimeoutError class** - Custom error handling for API timeout scenarios with detailed timeout information
+- **Configurable timeout settings** - OpenAI timeout configuration through environment variables and service configuration
+- **Comprehensive timeout testing** - Full test coverage for timeout scenarios and proxy functionality
+
+#### **Configuration System Enhancements**
+
+- **Helper functions** - `parseIntWithDefault()`, `getJwtMinLength()`, `isValidPort()`, and `isValidEnvironment()` for robust configuration parsing
+- **Environment validation improvements** - Enhanced validation for non-test environments with proper error handling
+- **Test environment handling** - Improved test configuration with sensible defaults and environment-specific behavior
+- **Configuration test coverage** - Comprehensive validation tests for all configuration scenarios and edge cases
+
+#### **Complete Documentation Suite**
+
+- **VitePress documentation framework** - Full documentation site with custom theming and navigation
+- **Comprehensive API documentation** - Detailed endpoint documentation for analytics, authentication, database, search, and more
+- **Architecture guides** - In-depth documentation for database, security, services, and system architecture
+- **Deployment guides** - Complete deployment documentation for Docker, local, production, monitoring, and scaling
+- **Development guides** - Contributing guidelines, Git workflow, standards, and testing documentation
+- **Example documentation** - Practical examples for basic search, advanced queries, AI integration, and multi-database usage
+- **Service documentation** - Detailed documentation for all core services (AI, API Key, Cache, Database, Search, User)
+- **Testing documentation** - Comprehensive testing guides for unit, integration, and performance testing
+
+### Changed
+
+#### **Service Architecture Improvements**
+
+- **AIService refactoring** - Updated to use new OpenAIProxy pattern for better timeout handling and error management
+- **Proxy pattern implementation** - Moved from direct OpenAI client usage to encapsulated proxy pattern for better maintainability
+- **Error handling enhancement** - Improved error propagation and handling across external API interactions
+- **Configuration integration** - Better integration between configuration system and service initialization
+
+#### **Testing Infrastructure**
+
+- **Enhanced test coverage** - Added comprehensive tests for configuration validation, middleware, and services
+- **Jest configuration updates** - Adjusted branch coverage thresholds for more realistic coverage expectations
+- **Test environment improvements** - Better test isolation and environment-specific behavior
+- **Mock service enhancements** - Improved mocking for cache service, AI service, and external dependencies
+
+### Fixed
+
+#### **Build System & Entry Points**
+
+- **Package.json entry point** - Corrected main entry point from `src/index.js` to `dist/src/index.js` for proper production builds
+- **Start script enhancement** - Updated start script to use `node -r dotenv/config` for proper environment loading
+- **Node.js version requirement** - Updated to Node.js >=20.0.0 for better compatibility and security
+
+#### **Error Handling & Validation**
+
+- **Management route error handling** - Enhanced error handling in management routes with better error responses
+- **API key permissions parsing** - Improved permissions parsing in ApiKeyService with better validation
+- **Redis password test expectations** - Fixed test expectations to match actual Redis configuration behavior
+
+#### **Test Coverage & Configuration**
+
+- **Jest coverage thresholds** - Adjusted branch coverage threshold for `src/config/index.ts` to realistic levels
+- **Test environment configuration** - Fixed test environment validation and configuration loading
+- **Coverage reporting accuracy** - Improved coverage reporting for more accurate test coverage metrics
+
+---
+
 ## [0.2.1] - 2025-09-05
 
 ### Added

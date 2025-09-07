@@ -33,6 +33,11 @@ export interface DatabaseConnection {
   isActive: boolean;
 }
 
+/**
+ * Database connection type for API responses (without password)
+ */
+export type DatabaseConnectionResponse = Omit<DatabaseConnection, 'password'>;
+
 export interface SearchRequest {
   /** Search query string */
   query: string;

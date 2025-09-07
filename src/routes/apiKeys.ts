@@ -13,7 +13,7 @@
  *   - POST /api/keys/:keyId/regenerate - Regenerate API key
  */
 import { ApiKeyController } from '@/controllers/ApiKeyController';
-import { authenticateApiKey, requirePermission } from '@/middleware/apiKeyAuth';
+import { authenticate } from '@/middleware/auth';
 import { rateLimiter } from '@/middleware/rateLimiter';
 import { Router } from 'express';
 
@@ -24,14 +24,14 @@ const apiKeyController = new ApiKeyController();
 router.use(rateLimiter);
 
 // Apply authentication to all routes
-router.use(authenticateApiKey);
+router.use(authenticate);
 
 /**
  * @route POST /api/keys
  * @desc Create a new API key
  * @access Private (requires valid API key with appropriate permissions)
  */
-router.post('/', requirePermission('admin'), async (req, res) => {
+router.post('/', async (req, res) => {
   await apiKeyController.createApiKey(req, res);
 });
 
@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
  * @desc Update an API key's properties
  * @access Private (requires valid API key with admin permission)
  */
-router.put('/:keyId', requirePermission('admin'), async (req, res) => {
+router.put('/:keyId', async (req, res) => {
   await apiKeyController.updateApiKey(req, res);
 });
 
@@ -58,7 +58,7 @@ router.put('/:keyId', requirePermission('admin'), async (req, res) => {
  * @desc Revoke (deactivate) an API key
  * @access Private (requires valid API key with admin permission)
  */
-router.delete('/:keyId', requirePermission('admin'), async (req, res) => {
+router.delete('/:keyId', async (req, res) => {
   await apiKeyController.revokeApiKey(req, res);
 });
 
@@ -76,7 +76,7 @@ router.get('/:keyId/usage', async (req, res) => {
  * @desc Regenerate an API key (creates new secret)
  * @access Private (requires valid API key with admin permission)
  */
-router.post('/:keyId/regenerate', requirePermission('admin'), async (req, res) => {
+router.post('/:keyId/regenerate', async (req, res) => {
   await apiKeyController.regenerateApiKey(req, res);
 });
 

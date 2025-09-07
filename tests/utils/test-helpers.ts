@@ -1,11 +1,11 @@
-import { v4 as uuidv4 } from 'uuid';
-import jwt from 'jsonwebtoken';
+import { config } from '@/config';
+import type { DatabaseConnection, User } from '@/types';
 import bcrypt from 'bcrypt';
+import Redis from 'ioredis';
+import jwt from 'jsonwebtoken';
 import type { Connection } from 'mysql2/promise';
 import { createConnection } from 'mysql2/promise';
-import Redis from 'ioredis';
-import type { DatabaseConnection, User } from '@/types';
-import { config } from '@/config';
+import { v4 as uuidv4 } from 'uuid';
 
 export class TestHelpers {
   private static dbConnection: Connection | null = null;
@@ -20,7 +20,7 @@ export class TestHelpers {
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '3306'),
         user: process.env.DB_USERNAME || 'root',
-        password: process.env.DB_PASSWORD || 'root',
+        password: process.env.DB_PASSWORD || '',
         database: process.env.DB_DATABASE || 'altus4_test',
       });
     }
@@ -64,7 +64,7 @@ export class TestHelpers {
 
     const connection = await this.getDbConnection();
     await connection.execute(
-      `INSERT INTO users (id, email, name, password_hash, role, created_at, last_active, is_active) 
+      `INSERT INTO users (id, email, name, password_hash, role, created_at, last_active, is_active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
@@ -93,9 +93,9 @@ export class TestHelpers {
       name: `Test Database ${Date.now()}`,
       host: 'localhost',
       port: 3306,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_password',
+      database: 'altus4_test',
+      username: 'root',
+      password: '',
       ssl: false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -105,7 +105,7 @@ export class TestHelpers {
 
     const connection = await this.getDbConnection();
     await connection.execute(
-      `INSERT INTO database_connections (id, user_id, name, host, port, database_name, username, password_encrypted, ssl_enabled, is_active, created_at, updated_at) 
+      `INSERT INTO database_connections (id, user_id, name, host, port, database_name, username, password, ssl_enabled, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dbConnection.id,
@@ -115,7 +115,7 @@ export class TestHelpers {
         dbConnection.port,
         dbConnection.database,
         dbConnection.username,
-        `encrypted_${dbConnection.password}`, // Mock encryption
+        dbConnection.password, // Use actual password for test
         dbConnection.ssl,
         dbConnection.isActive,
         dbConnection.createdAt,
@@ -151,8 +151,8 @@ export class TestHelpers {
     // Clean database tables
     await connection.execute('DELETE FROM search_analytics');
     await connection.execute('DELETE FROM database_connections');
+    await connection.execute('DELETE FROM api_keys');
     await connection.execute('DELETE FROM users');
-    await connection.execute('DELETE FROM test_content');
 
     // Clean Redis
     await redis.flushdb();

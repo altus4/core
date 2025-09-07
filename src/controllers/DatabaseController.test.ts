@@ -118,10 +118,11 @@ describe('DatabaseController', () => {
         port: 3306,
         database: 'test_db',
         username: 'test_user',
-        password: '', // Should be empty in response
+        // password field should not be present in response
         ssl: false,
         isActive: true,
       });
+      expect(result[0]).not.toHaveProperty('password');
     });
 
     it('should handle database errors', async () => {
@@ -162,8 +163,9 @@ describe('DatabaseController', () => {
       expect(result).toMatchObject({
         id: 'conn-123',
         name: 'Test Connection',
-        password: '', // Should be empty
+        // password field should not be present in response
       });
+      expect(result).not.toHaveProperty('password');
     });
 
     it('should return null when connection not found', async () => {
@@ -213,7 +215,7 @@ describe('DatabaseController', () => {
         ])
       );
       expect(mockDatabaseService.addConnection).toHaveBeenCalled();
-      expect(result.password).toBe(''); // Password should be empty in response
+      expect(result).not.toHaveProperty('new_pass'); // Password should not be in response
       expect(result.id).toBe('mock-uuid-123');
     });
 

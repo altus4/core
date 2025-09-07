@@ -5,21 +5,21 @@
  * analyzing queries, retrieving trends, and accessing search history.
  */
 
+import type { DatabaseConnection, User } from '@/types';
+import { testDatabase } from '../test-database';
+import { TestHelpers } from '../utils/test-helpers';
 import type { TestServer } from './test-server';
 import {
   createAuthenticatedRequest,
   setupTestEnvironment,
   teardownTestEnvironment,
 } from './test-server';
-import { testDatabase } from '../test-database';
-import { TestHelpers } from '../utils/test-helpers';
-import type { DatabaseConnection, User } from '@/types';
 
 describe('Search Integration Tests', () => {
   let server: TestServer;
   let testUser: User & { password: string };
   let authToken: string;
-  let authenticatedRequest: ReturnType<typeof createAuthenticatedRequest>;
+  let apiKey: string;
   let testConnection: DatabaseConnection;
 
   beforeAll(async () => {
@@ -35,7 +35,21 @@ describe('Search Integration Tests', () => {
     await testDatabase.cleanup();
     testUser = await TestHelpers.createTestUser();
     authToken = TestHelpers.generateTestToken(testUser);
-    authenticatedRequest = createAuthenticatedRequest(server, authToken);
+
+    // Create API key for search operations (search routes require API key auth)
+    const apiKeyResponse = await server
+      .request()
+      .post('/api/v1/keys')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        name: 'Search Test API Key',
+        environment: 'test',
+        permissions: ['search', 'analytics'],
+        rateLimitTier: 'free',
+      })
+      .expect(201);
+
+    apiKey = apiKeyResponse.body.data.secretKey;
     testConnection = await TestHelpers.createTestDatabaseConnection(testUser.id, {
       name: 'Test Search Database',
       database: 'altus4_test', // Use the test database
@@ -52,8 +66,10 @@ describe('Search Integration Tests', () => {
         offset: 0,
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
@@ -75,8 +91,10 @@ describe('Search Integration Tests', () => {
         limit: 5,
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
@@ -93,8 +111,10 @@ describe('Search Integration Tests', () => {
         includeAnalytics: true,
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
@@ -111,8 +131,10 @@ describe('Search Integration Tests', () => {
         searchMode: 'natural',
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
@@ -129,8 +151,10 @@ describe('Search Integration Tests', () => {
         searchMode: 'natural',
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
@@ -146,15 +170,19 @@ describe('Search Integration Tests', () => {
         offset: 0,
       };
 
-      const firstPage = await authenticatedRequest
+      const firstPage = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
 
       expect(firstPage.body.data.results.length).toBeLessThanOrEqual(2);
 
-      const secondPage = await authenticatedRequest
+      const secondPage = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send({ ...searchRequest, offset: 2 })
         .expect(200);
 
@@ -171,8 +199,10 @@ describe('Search Integration Tests', () => {
         databases: [testConnection.id],
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(400);
 
@@ -186,8 +216,10 @@ describe('Search Integration Tests', () => {
         databases: [testConnection.id],
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(400);
 
@@ -202,8 +234,10 @@ describe('Search Integration Tests', () => {
         searchMode: 'invalid_mode',
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(400);
 
@@ -233,8 +267,10 @@ describe('Search Integration Tests', () => {
         limit: 101, // Exceeds maximum of 100
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(400);
 
@@ -244,8 +280,10 @@ describe('Search Integration Tests', () => {
 
   describe('GET /api/v1/search/suggestions', () => {
     it('should get search suggestions successfully', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/suggestions')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({
           query: 'MyS',
           databases: [testConnection.id],
@@ -258,8 +296,10 @@ describe('Search Integration Tests', () => {
     });
 
     it('should filter suggestions by tables when specified', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/suggestions')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({
           query: 'prog',
           databases: [testConnection.id],
@@ -272,8 +312,10 @@ describe('Search Integration Tests', () => {
     });
 
     it('should reject empty query for suggestions', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/suggestions')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({
           query: '',
           databases: [testConnection.id],
@@ -284,8 +326,10 @@ describe('Search Integration Tests', () => {
     });
 
     it('should limit suggestion query length', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/suggestions')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({
           query: 'a'.repeat(101), // Exceeds 100 character limit
           databases: [testConnection.id],
@@ -304,8 +348,10 @@ describe('Search Integration Tests', () => {
         databases: [testConnection.id],
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search/analyze')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(analyzeRequest)
         .expect(200);
 
@@ -321,8 +367,10 @@ describe('Search Integration Tests', () => {
         databases: [],
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search/analyze')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(analyzeRequest)
         .expect(400);
 
@@ -336,8 +384,10 @@ describe('Search Integration Tests', () => {
         databases: [testConnection.id],
       };
 
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search/analyze')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(analyzeRequest)
         .expect(400);
 
@@ -377,7 +427,11 @@ describe('Search Integration Tests', () => {
     });
 
     it('should get user search trends successfully', async () => {
-      const response = await authenticatedRequest.get('/api/v1/search/trends').expect(200);
+      const response = await server
+        .request()
+        .get('/api/v1/search/trends')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('totalSearches');
@@ -406,14 +460,14 @@ describe('Search Integration Tests', () => {
       // Insert search history for testing
       for (let i = 1; i <= 25; i++) {
         await testDatabase.query(
-          `INSERT INTO searches (id, userId, query, searchMode, databases, resultCount, executionTime)
+          `INSERT INTO search_analytics (id, user_id, query_text, search_mode, database_id, result_count, execution_time_ms)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             `search-${i}`,
             testUser.id,
             `test query ${i}`,
             'natural',
-            JSON.stringify([testConnection.id]),
+            testConnection.id,
             i * 2,
             100 + i,
           ]
@@ -422,7 +476,11 @@ describe('Search Integration Tests', () => {
     });
 
     it('should get search history with default pagination', async () => {
-      const response = await authenticatedRequest.get('/api/v1/search/history').expect(200);
+      const response = await server
+        .request()
+        .get('/api/v1/search/history')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('searches');
@@ -434,8 +492,10 @@ describe('Search Integration Tests', () => {
     });
 
     it('should handle pagination parameters', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/history')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({ limit: 5, offset: 10 })
         .expect(200);
 
@@ -458,8 +518,10 @@ describe('Search Integration Tests', () => {
     });
 
     it('should order search history by most recent first', async () => {
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .get('/api/v1/search/history')
+        .set('Authorization', `Bearer ${apiKey}`)
         .query({ limit: 3 })
         .expect(200);
 
@@ -485,8 +547,10 @@ describe('Search Integration Tests', () => {
       };
 
       const startTime = Date.now();
-      const response = await authenticatedRequest
+      const response = await server
+        .request()
         .post('/api/v1/search')
+        .set('Authorization', `Bearer ${apiKey}`)
         .send(searchRequest)
         .expect(200);
       const endTime = Date.now();
@@ -504,7 +568,12 @@ describe('Search Integration Tests', () => {
       };
 
       const promises = Array.from({ length: 5 }, () =>
-        authenticatedRequest.post('/api/v1/search').send(searchRequest)
+        server
+          .request()
+          .post('/api/v1/search')
+          .set('Authorization', `Bearer ${apiKey}`)
+          .send(searchRequest)
+          .expect(200)
       );
 
       const responses = await Promise.all(promises);

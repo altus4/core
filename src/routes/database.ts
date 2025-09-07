@@ -11,7 +11,7 @@ import { DatabaseController } from '@/controllers/DatabaseController';
 import type { AuthenticatedRequest } from '@/middleware/auth';
 import { authenticate } from '@/middleware/auth';
 import { validateRequest } from '@/middleware/validation';
-import type { ApiResponse, DatabaseConnection, TableSchema } from '@/types';
+import type { ApiResponse, DatabaseConnectionResponse, TableSchema } from '@/types';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -48,7 +48,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res) => {
   try {
     const connections = await databaseController.getUserConnections(req.user!.id);
 
-    const response: ApiResponse<DatabaseConnection[]> = {
+    const response: ApiResponse<DatabaseConnectionResponse[]> = {
       success: true,
       data: connections,
       meta: {
@@ -82,7 +82,7 @@ router.post(
     try {
       const connection = await databaseController.addConnection(req.user!.id, req.body);
 
-      const response: ApiResponse<DatabaseConnection> = {
+      const response: ApiResponse<DatabaseConnectionResponse> = {
         success: true,
         data: connection,
         meta: {
@@ -126,7 +126,7 @@ router.get('/:connectionId', authenticate, async (req: AuthenticatedRequest, res
       } as ApiResponse);
     }
 
-    const response: ApiResponse<DatabaseConnection> = {
+    const response: ApiResponse<DatabaseConnectionResponse> = {
       success: true,
       data: connection,
       meta: {
@@ -174,7 +174,7 @@ router.put(
         } as ApiResponse);
       }
 
-      const response: ApiResponse<DatabaseConnection> = {
+      const response: ApiResponse<DatabaseConnectionResponse> = {
         success: true,
         data: connection,
         meta: {

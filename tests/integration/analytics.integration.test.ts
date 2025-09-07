@@ -5,15 +5,15 @@
  * popular queries, search history, insights, dashboard data, and admin endpoints.
  */
 
+import type { DatabaseConnection, User } from '@/types';
+import { testDatabase } from '../test-database';
+import { TestHelpers } from '../utils/test-helpers';
 import type { TestServer } from './test-server';
 import {
   createAuthenticatedRequest,
   setupTestEnvironment,
   teardownTestEnvironment,
 } from './test-server';
-import { testDatabase } from '../test-database';
-import { TestHelpers } from '../utils/test-helpers';
-import type { DatabaseConnection, User } from '@/types';
 
 describe('Analytics Integration Tests', () => {
   let server: TestServer;
@@ -40,6 +40,8 @@ describe('Analytics Integration Tests', () => {
     // Create regular test user
     testUser = await TestHelpers.createTestUser();
     authToken = TestHelpers.generateTestToken(testUser);
+
+    // Analytics routes use JWT authentication, not API key authentication
     authenticatedRequest = createAuthenticatedRequest(server, authToken);
 
     // Create admin user
@@ -49,7 +51,22 @@ describe('Analytics Integration Tests', () => {
       role: 'admin',
     });
     adminToken = TestHelpers.generateTestToken(adminUser);
-    adminRequest = createAuthenticatedRequest(server, adminToken);
+
+    // Create API key for admin operations
+    const adminApiKeyResponse = await server
+      .request()
+      .post('/api/v1/keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Admin Analytics API Key',
+        environment: 'test',
+        permissions: ['search', 'analytics'],
+        rateLimitTier: 'free',
+      })
+      .expect(201);
+
+    const adminApiKey = adminApiKeyResponse.body.data.secretKey;
+    adminRequest = createAuthenticatedRequest(server, adminApiKey);
 
     testConnection = await TestHelpers.createTestDatabaseConnection(testUser.id, {
       name: 'Test Analytics Database',
@@ -89,14 +106,14 @@ describe('Analytics Integration Tests', () => {
 
     for (const search of searches) {
       await testDatabase.query(
-        `INSERT INTO searches (id, userId, query, searchMode, databases, resultCount, executionTime, createdAt)
+        `INSERT INTO search_analytics (id, user_id, query_text, search_mode, database_id, result_count, execution_time_ms, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL FLOOR(RAND() * 30) DAY)`,
         [
           search.id,
           testUser.id,
           search.query,
           search.mode,
-          JSON.stringify([testConnection.id]),
+          testConnection.id,
           search.resultCount,
           search.execTime,
         ]
@@ -126,13 +143,17 @@ describe('Analytics Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('totalSearches');
-      expect(response.body.data).toHaveProperty('averageResponseTime');
-      expect(response.body.data).toHaveProperty('searchVolumeByDay');
-      expect(response.body.data).toHaveProperty('topQueries');
-      expect(response.body.data).toHaveProperty('searchModes');
-      expect(typeof response.body.data.totalSearches).toBe('number');
-      expect(typeof response.body.data.averageResponseTime).toBe('number');
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
+
+      const trend = response.body.data[0];
+      expect(trend).toHaveProperty('period');
+      expect(trend).toHaveProperty('queryVolume');
+      expect(trend).toHaveProperty('avgResponseTime');
+      expect(trend).toHaveProperty('topQueries');
+      expect(trend).toHaveProperty('popularCategories');
+      expect(typeof trend.queryVolume).toBe('number');
+      expect(typeof trend.avgResponseTime).toBe('number');
     });
 
     it('should filter trends by date range', async () => {
@@ -149,7 +170,7 @@ describe('Analytics Integration Tests', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('totalSearches');
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
 
     it('should accept different time periods', async () => {

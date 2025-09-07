@@ -131,6 +131,7 @@ export class ApiKeyController {
             environment: result.apiKey.environment,
             permissions: result.apiKey.permissions,
             rateLimitTier: result.apiKey.rateLimitTier,
+            isActive: result.apiKey.isActive,
             expiresAt: result.apiKey.expiresAt,
             createdAt: result.apiKey.createdAt,
           },

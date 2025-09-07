@@ -11,7 +11,7 @@
  */
 import { config } from '@/config';
 import { DatabaseService } from '@/services/DatabaseService';
-import type { DatabaseConnection, TableSchema } from '@/types';
+import type { DatabaseConnection, DatabaseConnectionResponse, TableSchema } from '@/types';
 import { EncryptionUtil } from '@/utils/encryption';
 import { logger } from '@/utils/logger';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -64,7 +64,7 @@ export class DatabaseController {
    * @param userId - ID of the user
    * @returns Array of DatabaseConnection objects
    */
-  public async getUserConnections(userId: string): Promise<DatabaseConnection[]> {
+  public async getUserConnections(userId: string): Promise<DatabaseConnectionResponse[]> {
     try {
       const conn = await this.connection;
 
@@ -84,7 +84,7 @@ export class DatabaseController {
         port: row.port,
         database: row.database_name,
         username: row.username,
-        password: '', // Don't return password in API responses
+        // password field omitted for security
         ssl: row.ssl_enabled,
         isActive: row.is_active,
         createdAt: new Date(row.created_at),
@@ -102,7 +102,7 @@ export class DatabaseController {
   public async getConnection(
     userId: string,
     connectionId: string
-  ): Promise<DatabaseConnection | null> {
+  ): Promise<DatabaseConnectionResponse | null> {
     try {
       const conn = await this.connection;
 
@@ -126,7 +126,7 @@ export class DatabaseController {
         port: row.port,
         database: row.database_name,
         username: row.username,
-        password: '', // Don't return password
+        // password field omitted for security
         ssl: row.ssl_enabled,
         isActive: row.is_active,
         createdAt: new Date(row.created_at),
@@ -144,7 +144,7 @@ export class DatabaseController {
   public async addConnection(
     userId: string,
     connectionData: Omit<DatabaseConnection, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>
-  ): Promise<DatabaseConnection> {
+  ): Promise<DatabaseConnectionResponse> {
     try {
       // First test the connection
       await this.testConnectionData(connectionData);
@@ -198,10 +198,8 @@ export class DatabaseController {
       logger.info(`Database connection added: ${connectionData.name} for user ${userId}`);
 
       // Return connection without password
-      return {
-        ...dbConnection,
-        password: '',
-      };
+      const { ...connectionWithoutPassword } = dbConnection;
+      return connectionWithoutPassword;
     } catch (error) {
       logger.error(`Failed to add connection for user ${userId}:`, error);
       throw error;
@@ -215,7 +213,7 @@ export class DatabaseController {
     userId: string,
     connectionId: string,
     updates: Partial<Omit<DatabaseConnection, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>>
-  ): Promise<DatabaseConnection | null> {
+  ): Promise<DatabaseConnectionResponse | null> {
     try {
       const conn = await this.connection;
 

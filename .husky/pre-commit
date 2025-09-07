@@ -28,16 +28,35 @@ print_error() {
     echo "${RED}❌ $1${NC}"
 }
 
-# Exit on any error
+# Exit on any error (we'll selectively override for optional steps)
 set -e
 
+# Allow developers to skip all pre-commit checks when needed
+if [ "$SKIP_PRECOMMIT_ALL" = "1" ]; then
+  echo "⏭️  SKIP_PRECOMMIT_ALL=1 set — skipping all checks"
+  exit 0
+fi
+
 print_status "1. Security & Dependencies Audit"
-echo "🔒 Checking for security vulnerabilities..."
-if npm audit --audit-level=high --production; then
-    print_success "No high-severity vulnerabilities found"
+if [ "$SKIP_PRECOMMIT_AUDIT" = "1" ]; then
+  print_warning "Skipping npm audit (SKIP_PRECOMMIT_AUDIT=1)"
 else
-    print_error "Security vulnerabilities detected! Run 'npm audit fix'"
-    exit 1
+  echo "🔒 Checking for security vulnerabilities..."
+  # Skip audit gracefully when offline
+  if npm ping >/dev/null 2>&1; then
+    if npm audit --audit-level=high --production; then
+      print_success "No high-severity vulnerabilities found"
+    else
+      if [ "$ALLOW_AUDIT_FAILURE" = "1" ]; then
+        print_warning "Security vulnerabilities detected, continuing (ALLOW_AUDIT_FAILURE=1)"
+      else
+        print_error "Security vulnerabilities detected! Run 'npm audit fix' or set ALLOW_AUDIT_FAILURE=1 to proceed"
+        exit 1
+      fi
+    fi
+  else
+    print_warning "Offline or registry unreachable — skipping npm audit"
+  fi
 fi
 
 print_status "2. Lint and Format Staged Files"
@@ -45,16 +64,28 @@ echo "📝 Formatting and linting staged files..."
 npx lint-staged
 
 print_status "3. TypeScript Type Checking"
-echo "🔍 Running TypeScript type checking..."
-npm run check
+if [ "$SKIP_PRECOMMIT_CHECK" = "1" ]; then
+  print_warning "Skipping typecheck/lint/format check (SKIP_PRECOMMIT_CHECK=1)"
+else
+  echo "🔍 Running TypeScript type checking..."
+  npm run check
+fi
 
 print_status "4. Build Verification"
-echo "🏗️  Building project to ensure it compiles..."
-npm run build
+if [ "$SKIP_PRECOMMIT_BUILD" = "1" ]; then
+  print_warning "Skipping build (SKIP_PRECOMMIT_BUILD=1)"
+else
+  echo "🏗️  Building project to ensure it compiles..."
+  npm run build
+fi
 
 print_status "5. Test Suite"
-echo "🧪 Running comprehensive test suite..."
-npm test
+if [ "$SKIP_PRECOMMIT_TESTS" = "1" ]; then
+  print_warning "Skipping tests (SKIP_PRECOMMIT_TESTS=1)"
+else
+  echo "🧪 Running comprehensive test suite..."
+  npm test
+fi
 
 print_status "6. Package Integrity"
 echo "📦 Verifying package.json integrity..."

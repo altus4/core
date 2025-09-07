@@ -138,6 +138,7 @@ describe('ApiKeyController', () => {
             environment: expectedResult.apiKey.environment,
             permissions: expectedResult.apiKey.permissions,
             rateLimitTier: expectedResult.apiKey.rateLimitTier,
+            isActive: expectedResult.apiKey.isActive,
             expiresAt: expectedResult.apiKey.expiresAt,
             createdAt: expectedResult.apiKey.createdAt,
           },
