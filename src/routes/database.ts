@@ -78,7 +78,7 @@ router.post(
   '/',
   authenticate,
   validateRequest({ body: addConnectionSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res, next) => {
     try {
       const connection = await databaseController.addConnection(req.user!.id, req.body);
 
@@ -94,13 +94,9 @@ router.post(
 
       res.status(201).json(response);
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'DATABASE_CONNECTION_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to add database connection',
-        },
-      } as ApiResponse);
+      // Let DatabaseError instances bubble up to the error handler middleware
+      // which will provide proper status codes and error responses
+      next(error);
     }
   }
 );

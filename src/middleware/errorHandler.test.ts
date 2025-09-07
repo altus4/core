@@ -15,7 +15,17 @@ jest.mock('@/utils/logger', () => ({
   },
 }));
 
+jest.mock('@/utils/database-errors', () => {
+  const actual = jest.requireActual('@/utils/database-errors');
+  return {
+    ...actual,
+    DatabaseError: actual.DatabaseError,
+    DatabaseErrorCode: actual.DatabaseErrorCode,
+  };
+});
+
 import { AppError, errorHandler } from './errorHandler';
+import { DatabaseError, DatabaseErrorCode } from '@/utils/database-errors';
 
 const mockRequest = (overrides: Partial<Request> = {}): Partial<Request> => ({
   url: '/api/v1/test',
@@ -277,6 +287,68 @@ describe('Error Handler Middleware', () => {
           message: 'Database connection refused',
           stack: expect.any(String),
           details: 'connect ECONNREFUSED 127.0.0.1:3306',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.2.1',
+        },
+      });
+    });
+
+    it('should handle DatabaseError instances with suggestions', () => {
+      const error = new DatabaseError(
+        DatabaseErrorCode.AUTHENTICATION_FAILED,
+        'Database authentication failed',
+        new Error('Access denied'),
+        ['Verify username and password', 'Check user permissions'],
+        false,
+        401
+      );
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'AUTHENTICATION_FAILED',
+          message: 'Database authentication failed',
+          suggestions: ['Verify username and password', 'Check user permissions'],
+          isRetryable: false,
+          stack: expect.any(String),
+          details: 'Database authentication failed',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.2.1',
+        },
+      });
+    });
+
+    it('should handle retryable DatabaseError instances', () => {
+      const error = new DatabaseError(
+        DatabaseErrorCode.CONNECTION_REFUSED,
+        'Unable to connect to database server',
+        new Error('ECONNREFUSED'),
+        ['Check if MySQL is running', 'Verify port configuration'],
+        true,
+        502
+      );
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.status).toHaveBeenCalledWith(502);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'CONNECTION_REFUSED',
+          message: 'Unable to connect to database server',
+          suggestions: ['Check if MySQL is running', 'Verify port configuration'],
+          isRetryable: true,
+          stack: expect.any(String),
+          details: 'Unable to connect to database server',
         },
         meta: {
           timestamp: expect.any(Date),

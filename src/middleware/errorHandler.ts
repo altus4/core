@@ -10,6 +10,7 @@
  */
 import { config } from '@/config';
 import type { ApiResponse } from '@/types';
+import { DatabaseError } from '@/utils/database-errors';
 import { logger } from '@/utils/logger';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -48,6 +49,11 @@ export const errorHandler = (
   let message = 'Internal server error';
 
   if (error instanceof AppError) {
+    const { statusCode: errorStatus, code: errorCode, message: errorMessage } = error;
+    statusCode = errorStatus;
+    code = errorCode;
+    message = errorMessage;
+  } else if (error instanceof DatabaseError) {
     const { statusCode: errorStatus, code: errorCode, message: errorMessage } = error;
     statusCode = errorStatus;
     code = errorCode;
@@ -97,6 +103,11 @@ export const errorHandler = (
     error: {
       code,
       message,
+      // Include suggestions for DatabaseError instances
+      ...(error instanceof DatabaseError && {
+        suggestions: error.suggestions,
+        isRetryable: error.isRetryable,
+      }),
       ...(config.environment === 'development' && {
         stack: error.stack,
         details: error.message,
