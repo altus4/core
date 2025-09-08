@@ -11,6 +11,11 @@
  *   - Interact with databases using other service methods
  */
 import type { ColumnInfo, DatabaseConnection, FullTextIndex, TableSchema } from '@/types';
+import {
+  createDatabaseError,
+  DatabaseError,
+  sanitizeErrorForLogging,
+} from '@/utils/database-errors';
 import { logger } from '@/utils/logger';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import mysql from 'mysql2/promise';
@@ -90,10 +95,17 @@ export class DatabaseService {
       this.connections.set(dbConfig.id, pool);
       logger.info(`Database connection added: ${dbConfig.name} (${dbConfig.id})`);
     } catch (error) {
-      logger.error(`Failed to add database connection ${dbConfig.name}:`, error);
-      throw new Error(
-        `Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const dbError = createDatabaseError(error);
+      logger.error(`Failed to add database connection ${dbConfig.name}:`, {
+        connectionId: dbConfig.id,
+        connectionName: dbConfig.name,
+        host: dbConfig.host,
+        port: dbConfig.port,
+        database: dbConfig.database,
+        username: dbConfig.username,
+        ...sanitizeErrorForLogging(dbError),
+      });
+      throw dbError;
     }
   }
 
@@ -159,8 +171,12 @@ export class DatabaseService {
     try {
       return await pool.getConnection();
     } catch (error) {
-      logger.error(`Failed to get connection for ${connectionId}:`, error);
-      throw error;
+      const dbError = createDatabaseError(error);
+      logger.error(`Failed to get connection for ${connectionId}:`, {
+        connectionId,
+        ...sanitizeErrorForLogging(dbError),
+      });
+      throw dbError;
     }
   }
 
@@ -174,7 +190,12 @@ export class DatabaseService {
       connection.release();
       return true;
     } catch (error) {
-      logger.error(`Connection test failed for ${connectionId}:`, error);
+      // If error is already a DatabaseError, use it directly; otherwise wrap it
+      const dbError = error instanceof DatabaseError ? error : createDatabaseError(error);
+      logger.error(`Connection test failed for ${connectionId}:`, {
+        connectionId,
+        ...sanitizeErrorForLogging(dbError),
+      });
       return false;
     }
   }
