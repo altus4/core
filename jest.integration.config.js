@@ -10,8 +10,11 @@ module.exports = {
   testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
 
   // Setup files
-  setupFiles: ['<rootDir>/tests/env-setup.js'],
-  setupFilesAfterEnv: ['<rootDir>/tests/integration-setup.ts'],
+  setupFiles: ['<rootDir>/tests/setup/env.setup.js'],
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup/integration.setup.ts',
+    '<rootDir>/tests/setup/refresh.setup.ts',
+  ],
 
   // Coverage configuration (disabled for integration tests)
   collectCoverage: false,

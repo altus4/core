@@ -630,6 +630,7 @@ describe('ApiKeyController', () => {
     const mockReq = {
       params: { keyId: 'key-123' },
       user: { id: 'user-123', role: 'user' },
+      query: {},
       get: jest.fn().mockReturnValue(undefined),
     } as any;
 
@@ -642,6 +643,7 @@ describe('ApiKeyController', () => {
       mockRes.status.mockClear();
       mockRes.json.mockClear();
       mockReq.get.mockClear();
+      mockApiKeyService.getApiKeyUsage.mockClear();
     });
 
     it('should get API key usage successfully', async () => {

@@ -8,24 +8,9 @@
  *   - Instantiate AltusServer to start the application
  */
 import { config } from '@/config';
-import { errorHandler } from '@/middleware/errorHandler';
-import { rateLimiter } from '@/middleware/rateLimiter';
-import { requestLogger } from '@/middleware/requestLogger';
-import { analyticsRoutes } from '@/routes/analytics';
-import apiKeyRoutes from '@/routes/apiKeys';
-import { authRoutes } from '@/routes/auth';
-import { databaseRoutes } from '@/routes/database';
-import managementRoutes from '@/routes/management';
-import { searchRoutes } from '@/routes/search';
+import { createApp } from '@/app';
 import { logger } from '@/utils/logger';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import express from 'express';
-import helmet from 'helmet';
 import { createServer } from 'http';
-
-// Load environment variables from .env file
-dotenv.config();
 
 /**
  * Main server class for Altus4.
@@ -35,7 +20,7 @@ class AltusServer {
   /**
    * Express application instance.
    */
-  private app: express.Application;
+  private app: ReturnType<typeof createApp>;
 
   /**
    * HTTP server instance.
@@ -46,76 +31,10 @@ class AltusServer {
    * Initialize the server, middleware, routes, and error handling.
    */
   constructor() {
-    this.app = express();
-    this.setupMiddleware();
-    this.setupRoutes();
-    this.setupErrorHandling();
-  }
-
-  /**
-   * Set up security, CORS, request parsing, logging, rate limiting, and health check endpoint.
-   */
-  private setupMiddleware(): void {
-    // Security middleware
-    this.app.use(helmet());
-    this.app.use(
-      cors({
-        origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-        credentials: true,
-      })
-    );
-
-    // Request parsing
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-    // Logging and rate limiting
-    this.app.use(requestLogger);
-    this.app.use(rateLimiter);
-
-    // Health check endpoint for monitoring
-    this.app.get('/health', (req, res) => {
-      res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: process.env.npm_package_version || '0.1.0',
-        uptime: process.uptime(),
-      });
-    });
-  }
-
-  /**
-   * Set up API routes for analytics, authentication, database, search, and API key management.
-   */
-  private setupRoutes(): void {
-    const apiV1 = express.Router();
-
-    // Mount route modules
-    apiV1.use('/auth', authRoutes);
-    apiV1.use('/search', searchRoutes);
-    apiV1.use('/databases', databaseRoutes);
-    apiV1.use('/analytics', analyticsRoutes);
-    apiV1.use('/keys', apiKeyRoutes);
-    apiV1.use('/management', managementRoutes);
-
-    // Mount API version
-    this.app.use('/api/v1', apiV1);
-
-    // 404 handler
-    this.app.use('*', (req, res) => {
-      res.status(404).json({
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Endpoint not found',
-        },
-      });
-    });
+    this.app = createApp();
   }
 
   private setupErrorHandling(): void {
-    this.app.use(errorHandler);
-
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
       logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -149,7 +68,7 @@ class AltusServer {
     }
   }
 
-  public getApp(): express.Application {
+  public getApp() {
     return this.app;
   }
 

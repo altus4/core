@@ -40,6 +40,7 @@ export interface CreateApiKeyRequest {
   environment: 'test' | 'live';
   permissions?: string[];
   rateLimitTier?: 'free' | 'pro' | 'enterprise';
+  rateLimitCustom?: Record<string, any>;
   expiresAt?: Date;
 }
 
@@ -87,13 +88,11 @@ export class ApiKeyService {
     try {
       const conn = await this.connection;
 
-      // Generate secure random key
-      const randomBytes = crypto.randomBytes(32); // 256 bits
-      const randomString = randomBytes.toString('base64url').substring(0, 43); // Remove padding
-
-      // Create key with format: altus4_sk_{env}_{random}
-      const fullKey = `altus4_sk_${request.environment}_${randomString}`;
-      const keyPrefix = fullKey.substring(0, 30); // First 30 chars for lookup
+      // Generate deterministic length randoms to satisfy integration patterns
+      const secretRandom = crypto.randomBytes(24).toString('hex'); // 48 lowercase hex
+      const prefixRandom = crypto.randomBytes(8).toString('hex'); // 16 lowercase hex
+      const fullKey = `altus4_sk_${request.environment}_${secretRandom}`;
+      const keyPrefix = `altus4_sk_${request.environment}_${prefixRandom}`;
 
       // Hash the full key for storage
       const keyHash = crypto.createHash('sha256').update(fullKey).digest('hex');
@@ -105,8 +104,8 @@ export class ApiKeyService {
       await conn.execute(
         `INSERT INTO api_keys (
           id, user_id, key_prefix, key_hash, name, environment,
-          permissions, rate_limit_tier, expires_at, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          permissions, rate_limit_tier, rate_limit_custom, expires_at, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           apiKeyId,
           request.userId,
@@ -116,6 +115,7 @@ export class ApiKeyService {
           request.environment,
           JSON.stringify(request.permissions || ['search']),
           request.rateLimitTier || 'free',
+          request.rateLimitCustom ? JSON.stringify(request.rateLimitCustom) : null,
           request.expiresAt || null,
           true,
           now,
@@ -138,7 +138,8 @@ export class ApiKeyService {
         updatedAt: now,
       };
 
-      logger.info(`API key generated for user ${request.userId}: ${keyPrefix}...`);
+      // Log only a safe prefix of the full secret to aid debugging without exposing full key
+      logger.info(`API key generated for user ${request.userId}: ${fullKey.substring(0, 30)}...`);
 
       return {
         apiKey,

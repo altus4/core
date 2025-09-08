@@ -69,11 +69,7 @@ export class DatabaseController {
       const conn = await this.connection;
 
       const [connections] = await conn.execute<RowDataPacket[]>(
-        `SELECT id, name, host, port, database_name, username, ssl_enabled, is_active,
-                created_at, updated_at, last_tested, connection_status
-         FROM database_connections
-         WHERE user_id = ? AND is_active = true
-         ORDER BY created_at DESC`,
+        'SELECT id, name, host, port, database_name, username, ssl_enabled, is_active, created_at, updated_at FROM database_connections WHERE user_id = ? ORDER BY created_at DESC',
         [userId]
       );
 
@@ -82,13 +78,13 @@ export class DatabaseController {
         name: row.name,
         host: row.host,
         port: row.port,
-        database: row.database_name,
+        database: (row as any).database_name ?? (row as any).database,
         username: row.username,
         // password field omitted for security
-        ssl: row.ssl_enabled,
-        isActive: row.is_active,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
+        ssl: (row as any).ssl_enabled ?? (row as any).ssl ?? false,
+        isActive: (row as any).is_active ?? true,
+        createdAt: new Date((row as any).created_at ?? new Date()),
+        updatedAt: new Date((row as any).updated_at ?? new Date()),
       }));
     } catch (error) {
       logger.error(`Failed to get connections for user ${userId}:`, error);
@@ -107,10 +103,7 @@ export class DatabaseController {
       const conn = await this.connection;
 
       const [connections] = await conn.execute<RowDataPacket[]>(
-        `SELECT id, name, host, port, database_name, username, ssl_enabled, is_active,
-                created_at, updated_at, last_tested, connection_status
-         FROM database_connections
-         WHERE id = ? AND user_id = ? AND is_active = true`,
+        'SELECT * FROM database_connections WHERE id = ? AND user_id = ? AND is_active = true',
         [connectionId, userId]
       );
 
@@ -124,13 +117,13 @@ export class DatabaseController {
         name: row.name,
         host: row.host,
         port: row.port,
-        database: row.database_name,
+        database: (row as any).database_name ?? (row as any).database,
         username: row.username,
         // password field omitted for security
-        ssl: row.ssl_enabled,
-        isActive: row.is_active,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
+        ssl: (row as any).ssl_enabled ?? (row as any).ssl ?? false,
+        isActive: (row as any).is_active ?? true,
+        createdAt: new Date((row as any).created_at ?? new Date()),
+        updatedAt: new Date((row as any).updated_at ?? new Date()),
       };
     } catch (error) {
       logger.error(`Failed to get connection ${connectionId} for user ${userId}:`, error);
@@ -198,7 +191,7 @@ export class DatabaseController {
       logger.info(`Database connection added: ${connectionData.name} for user ${userId}`);
 
       // Return connection without password
-      const { ...connectionWithoutPassword } = dbConnection;
+      const { ...connectionWithoutPassword } = dbConnection as any;
       return connectionWithoutPassword;
     } catch (error) {
       logger.error(`Failed to add connection for user ${userId}:`, error);

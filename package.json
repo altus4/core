@@ -66,6 +66,7 @@
   "author": "Jerome Thayananthajothy",
   "license": "MIT",
   "devDependencies": {
+    "@faker-js/faker": "^10.0.0",
     "@types/bcrypt": "^5.0.0",
     "@types/cors": "^2.8.13",
     "@types/express": "^4.17.17",

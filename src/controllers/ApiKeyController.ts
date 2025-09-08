@@ -44,6 +44,7 @@ export class ApiKeyController {
         environment = 'test',
         permissions = ['search'],
         rateLimitTier = 'free',
+        rateLimitCustom,
         expiresAt,
       } = req.body;
 
@@ -114,6 +115,7 @@ export class ApiKeyController {
         environment,
         permissions,
         rateLimitTier,
+        rateLimitCustom,
         expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       };
 
@@ -135,7 +137,6 @@ export class ApiKeyController {
             expiresAt: result.apiKey.expiresAt,
             createdAt: result.apiKey.createdAt,
           },
-          // Return the full secret key only once during creation
           secretKey: result.secretKey,
           warning:
             'This is the only time the full API key will be shown. Please store it securely.',
@@ -406,8 +407,8 @@ export class ApiKeyController {
       res.json({
         success: true,
         data: {
-          message: 'API key revoked successfully',
           keyId,
+          message: 'API key revoked successfully',
         },
         meta: {
           timestamp: new Date(),
@@ -454,6 +455,32 @@ export class ApiKeyController {
           },
         } as ApiResponse);
         return;
+      }
+
+      // Validate optional days parameter
+      const daysParam = (req.query.days as string) || undefined;
+      if (daysParam !== undefined) {
+        const days = parseInt(daysParam as string, 10);
+        if (!Number.isFinite(days) || days < 1) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'days must be a positive number',
+            },
+          } as ApiResponse);
+          return;
+        }
+        if (days > 365) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'days cannot exceed 365',
+            },
+          } as ApiResponse);
+          return;
+        }
       }
 
       const usage = await this.apiKeyService.getApiKeyUsage(keyId, req.user.id);

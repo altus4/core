@@ -14,6 +14,9 @@ import type { ColumnInfo, DatabaseConnection, FullTextIndex, TableSchema } from 
 import { logger } from '@/utils/logger';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import mysql from 'mysql2/promise';
+import { createConnection } from 'mysql2/promise';
+import { config } from '@/config';
+import { EncryptionUtil } from '@/utils/encryption';
 
 export class DatabaseService {
   /**
@@ -35,6 +38,17 @@ export class DatabaseService {
    * Timeout (ms) for establishing a new connection.
    */
   private readonly connectionTimeout = 60000;
+
+  /**
+   * Metadata connection to hydrate pools on-demand from stored records.
+   */
+  private metaConnection = createConnection({
+    host: config.database.host,
+    port: config.database.port,
+    user: config.database.username,
+    password: config.database.password,
+    database: config.database.database,
+  });
 
   /**
    * Add a new database connection to the pool.
@@ -101,9 +115,45 @@ export class DatabaseService {
    * Get a connection from the pool
    */
   private async getConnection(connectionId: string): Promise<PoolConnection> {
-    const pool = this.connections.get(connectionId);
+    let pool = this.connections.get(connectionId);
     if (!pool) {
-      throw new Error(`Database connection not found: ${connectionId}`);
+      // Hydrate from DB if possible
+      try {
+        const conn = await this.metaConnection;
+        const [rows] = await conn.execute<RowDataPacket[]>(
+          `SELECT id, name, host, port, database_name, username,
+                  password, password_encrypted, ssl_enabled, is_active
+           FROM database_connections
+           WHERE id = ? AND is_active = true`,
+          [connectionId]
+        );
+        if (rows.length === 0) {
+          throw new Error(`Database connection not found: ${connectionId}`);
+        }
+        const row = rows[0] as any;
+        let { password } = row;
+        if (!password && row.password_encrypted) {
+          try {
+            password = EncryptionUtil.decrypt(row.password_encrypted);
+          } catch (e) {
+            logger.error('Failed to decrypt stored database password:', e);
+            // fall back to empty to avoid crashing; queries will likely fail
+            password = '';
+          }
+        }
+        pool = mysql.createPool({
+          host: row.host,
+          port: row.port,
+          user: row.username,
+          password,
+          database: row.database_name ?? row.database,
+          connectionLimit: this.maxConnections,
+        });
+        this.connections.set(connectionId, pool);
+      } catch (error) {
+        logger.error(`Failed to hydrate connection for ${connectionId}:`, error);
+        throw new Error(`Database connection not found: ${connectionId}`);
+      }
     }
 
     try {

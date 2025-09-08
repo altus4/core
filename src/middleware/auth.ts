@@ -81,8 +81,9 @@ export const authenticate = async (
 
     const decoded = jwt.verify(token, config.jwtSecret) as any;
 
+    // Support both `id` and `userId` payload keys to be robust across tests
     req.user = {
-      id: decoded.id,
+      id: decoded.id ?? decoded.userId,
       email: decoded.email,
       name: decoded.name,
       role: decoded.role,

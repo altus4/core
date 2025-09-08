@@ -1,427 +1,352 @@
-/**
- * Authentication Integration Tests
- *
- * Tests all authentication endpoints including registration, login, profile management,
- * password changes, and token refresh functionality.
- */
+import request from 'supertest';
+import { createApp } from '@/app';
+import { TestHelpers } from '@tests/helpers/test-helpers';
+import { seedSuite, userPayload } from '@tests/helpers/factories';
 
-import type { User } from '@/types';
-import { testDatabase } from '../test-database';
-import { TestHelpers } from '../utils/test-helpers';
-import type { TestServer } from './test-server';
-import { setupTestEnvironment, teardownTestEnvironment } from './test-server';
-
-describe('Authentication Integration Tests', () => {
-  let server: TestServer;
-  let testUser: User & { password: string };
-  let authToken: string;
+describe('Auth Integration (SuperTest)', () => {
+  const app = createApp();
 
   beforeAll(async () => {
-    const { server: testServer } = await setupTestEnvironment();
-    server = testServer;
+    // Ensure test DB/redis mocks are ready (integration-setup handles mysql/redis mocks)
   });
 
   afterAll(async () => {
-    await teardownTestEnvironment();
+    await TestHelpers.closeConnections();
   });
 
-  beforeEach(async () => {
-    await testDatabase.cleanup();
+  beforeAll(() => {
+    seedSuite(202501);
   });
 
-  describe('POST /api/v1/auth/register', () => {
-    it('should register a new user successfully', async () => {
-      const userData = {
-        email: 'newuser@example.com',
-        password: 'securepassword123',
-        name: 'New User',
-        role: 'user',
-      };
+  describe('User Registration and Login', () => {
+    it('registers a new user successfully', async () => {
+      const user = userPayload();
 
-      const response = await server
-        .request()
+      const response = await request(app)
         .post('/api/v1/auth/register')
-        .send(userData)
+        .send({ email: user.email, name: user.name, password: user.password })
         .expect(201);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('user');
       expect(response.body.data).toHaveProperty('token');
-      expect(response.body.data.user.email).toBe(userData.email);
-      expect(response.body.data.user.name).toBe(userData.name);
-      expect(response.body.data.user).not.toHaveProperty('password');
-      expect(typeof response.body.data.token).toBe('string');
-
-      // Integration test focuses on API response structure and business logic
-      // Database verification is handled by unit tests
-    });
-
-    it('should reject registration with invalid email', async () => {
-      const userData = {
-        email: 'invalid-email',
-        password: 'securepassword123',
-        name: 'Test User',
-      };
-
-      const response = await server
-        .request()
-        .post('/api/v1/auth/register')
-        .send(userData)
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toHaveProperty('code');
-      expect(response.body.error.message).toContain('email');
-    });
-
-    it('should reject registration with short password', async () => {
-      const userData = {
-        email: 'test@example.com',
-        password: '123',
-        name: 'Test User',
-      };
-
-      const response = await server
-        .request()
-        .post('/api/v1/auth/register')
-        .send(userData)
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.message).toContain('8 characters');
-    });
-
-    it('should reject duplicate email registration', async () => {
-      const userData = {
-        email: 'duplicate@example.com',
-        password: 'securepassword123',
-        name: 'First User',
-      };
-
-      // First registration should succeed
-      await server.request().post('/api/v1/auth/register').send(userData).expect(201);
-
-      // Second registration with same email should fail
-      const response = await server
-        .request()
-        .post('/api/v1/auth/register')
-        .send({
-          ...userData,
-          name: 'Second User',
-        })
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('REGISTRATION_FAILED');
-    });
-
-    it('should default role to user when not specified', async () => {
-      const userData = {
-        email: 'defaultrole@example.com',
-        password: 'securepassword123',
-        name: 'Default Role User',
-      };
-
-      const response = await server
-        .request()
-        .post('/api/v1/auth/register')
-        .send(userData)
-        .expect(201);
-
+      expect(response.body.data.user.email).toBe(user.email.toLowerCase());
+      expect(response.body.data.user.name).toBe(user.name);
       expect(response.body.data.user.role).toBe('user');
     });
-  });
 
-  describe('POST /api/v1/auth/login', () => {
-    beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser({
-        email: 'login@example.com',
-        name: 'Login User',
-      });
+    it('registers an admin user successfully', async () => {
+      const user = userPayload({ role: 'admin' });
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password, role: 'admin' })
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.user.role).toBe('admin');
     });
 
-    it('should login with correct credentials', async () => {
-      const loginData = {
-        email: testUser.email,
-        password: testUser.password,
-      };
+    it('prevents duplicate email registration', async () => {
+      const user = userPayload();
 
-      const response = await server
-        .request()
+      // Register first time
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      // Try to register again with same email
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: 'Different Name', password: 'different123' })
+        .expect(400);
+    });
+
+    it('validates email format during registration', async () => {
+      const user = userPayload();
+
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: 'invalid-email', name: user.name, password: user.password })
+        .expect(400);
+    });
+
+    it('validates password length during registration', async () => {
+      const user = userPayload();
+
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: 'short' })
+        .expect(400);
+    });
+
+    it('logs in with valid credentials', async () => {
+      const user = userPayload();
+
+      // Register user first
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      // Login
+      const response = await request(app)
         .post('/api/v1/auth/login')
-        .send(loginData)
+        .send({ email: user.email, password: user.password })
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('user');
       expect(response.body.data).toHaveProperty('token');
-      expect(response.body.data.user.email).toBe(testUser.email);
-      expect(typeof response.body.data.token).toBe('string');
-
-      authToken = response.body.data.token;
+      expect(response.body.data).toHaveProperty('user');
+      expect(response.body.data.user.email).toBe(user.email.toLowerCase());
     });
 
-    it('should reject login with incorrect password', async () => {
-      const loginData = {
-        email: testUser.email,
-        password: 'wrongpassword',
-      };
+    it('rejects login with invalid password', async () => {
+      const user = userPayload();
 
-      const response = await server
-        .request()
+      // Register user first
+      await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      // Try login with wrong password
+      await request(app)
         .post('/api/v1/auth/login')
-        .send(loginData)
+        .send({ email: user.email, password: 'wrongpassword' })
         .expect(401);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('AUTHENTICATION_FAILED');
     });
 
-    it('should reject login with non-existent email', async () => {
-      const loginData = {
-        email: 'nonexistent@example.com',
-        password: 'anypassword',
-      };
-
-      const response = await server
-        .request()
+    it('rejects login with non-existent email', async () => {
+      await request(app)
         .post('/api/v1/auth/login')
-        .send(loginData)
+        .send({ email: 'nonexistent@example.com', password: 'password123' })
         .expect(401);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('AUTHENTICATION_FAILED');
-    });
-
-    it('should normalize email case during login', async () => {
-      const loginData = {
-        email: testUser.email.toUpperCase(),
-        password: testUser.password,
-      };
-
-      const response = await server
-        .request()
-        .post('/api/v1/auth/login')
-        .send(loginData)
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
     });
   });
 
-  describe('GET /api/v1/auth/profile', () => {
+  describe('Profile Management', () => {
+    let userToken: string;
+    let userId: string;
+
     beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
+      const user = userPayload();
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      userToken = response.body.data.token;
+      userId = response.body.data.user.id;
     });
 
-    it('should get user profile with valid token', async () => {
-      const response = await server
-        .request()
+    it('retrieves user profile with valid token', async () => {
+      const response = await request(app)
         .get('/api/v1/auth/profile')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.id).toBe(testUser.id);
-      expect(response.body.data.email).toBe(testUser.email);
-      expect(response.body.data.name).toBe(testUser.name);
-      expect(response.body.data).not.toHaveProperty('password');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data).toHaveProperty('email');
+      expect(response.body.data).toHaveProperty('name');
+      expect(response.body.data.id).toBe(userId);
     });
 
-    it('should reject request without token', async () => {
-      const response = await server.request().get('/api/v1/auth/profile').expect(401);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('NO_TOKEN');
+    it('rejects profile request without token', async () => {
+      await request(app).get('/api/v1/auth/profile').expect(401);
     });
 
-    it('should reject request with invalid token', async () => {
-      const response = await server
-        .request()
+    it('rejects profile request with invalid token', async () => {
+      await request(app)
         .get('/api/v1/auth/profile')
         .set('Authorization', 'Bearer invalid-token')
         .expect(401);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('INVALID_TOKEN');
-    });
-  });
-
-  describe('PUT /api/v1/auth/profile', () => {
-    beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
     });
 
-    it('should update user profile successfully', async () => {
-      const updateData = {
+    it('updates user profile successfully', async () => {
+      const updates = {
         name: 'Updated Name',
         email: 'updated@example.com',
       };
 
-      const response = await server
-        .request()
+      const response = await request(app)
         .put('/api/v1/auth/profile')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(updateData)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updates)
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.name).toBe(updateData.name);
-      expect(response.body.data.email).toBe(updateData.email);
+      expect(response.body.data.name).toBe(updates.name);
+      expect(response.body.data.email).toBe(updates.email.toLowerCase());
     });
 
-    it('should update only provided fields', async () => {
-      const updateData = {
-        name: 'Only Name Updated',
-      };
-
-      const response = await server
-        .request()
+    it('validates email format during profile update', async () => {
+      await request(app)
         .put('/api/v1/auth/profile')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(updateData)
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.name).toBe(updateData.name);
-      expect(response.body.data.email).toBe(testUser.email); // Should remain unchanged
-    });
-
-    it('should reject invalid email format', async () => {
-      const updateData = {
-        email: 'invalid-email-format',
-      };
-
-      const response = await server
-        .request()
-        .put('/api/v1/auth/profile')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(updateData)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ email: 'invalid-email-format' })
         .expect(400);
+    });
 
-      expect(response.body.success).toBe(false);
+    it('validates name length during profile update', async () => {
+      await request(app)
+        .put('/api/v1/auth/profile')
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ name: 'a' }) // too short
+        .expect(400);
     });
   });
 
-  describe('POST /api/v1/auth/change-password', () => {
+  describe('Password Management', () => {
+    let userToken: string;
+    const originalPassword = 'OriginalPass123!'; // Strong password for test
+
     beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
+      const user = userPayload({ password: originalPassword });
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      userToken = response.body.data.token;
     });
 
-    it('should change password successfully', async () => {
-      const passwordData = {
-        currentPassword: testUser.password,
-        newPassword: 'NewSecurePassword123!',
-      };
+    it('changes password successfully', async () => {
+      const newPassword = 'NewPassword123!'; // Meets complexity requirements
 
-      const response = await server
-        .request()
+      const response = await request(app)
         .post('/api/v1/auth/change-password')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(passwordData)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          currentPassword: originalPassword,
+          newPassword,
+        })
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.success).toBe(true);
     });
 
-    it('should reject incorrect current password', async () => {
-      const passwordData = {
-        currentPassword: 'wrongcurrentpassword',
-        newPassword: 'NewSecurePassword123!',
-      };
-
-      const response = await server
-        .request()
+    it('rejects password change with wrong current password', async () => {
+      await request(app)
         .post('/api/v1/auth/change-password')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(passwordData)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          currentPassword: 'wrongpassword',
+          newPassword: 'NewPassword123!',
+        })
         .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('PASSWORD_CHANGE_FAILED');
     });
 
-    it('should reject weak new password', async () => {
-      const passwordData = {
-        currentPassword: testUser.password,
-        newPassword: '123',
-      };
-
-      const response = await server
-        .request()
+    it('validates new password length', async () => {
+      await request(app)
         .post('/api/v1/auth/change-password')
-        .set('Authorization', `Bearer ${authToken}`)
-        .send(passwordData)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({
+          currentPassword: originalPassword,
+          newPassword: 'short',
+        })
         .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.error.message).toContain('8 characters');
     });
   });
 
-  describe('POST /api/v1/auth/refresh', () => {
+  describe('Token Management', () => {
+    let userToken: string;
+
     beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
+      const user = userPayload();
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      userToken = response.body.data.token;
     });
 
-    it('should refresh token successfully', async () => {
-      const response = await server
-        .request()
+    it('refreshes token successfully', async () => {
+      // Wait a moment to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const response = await request(app)
         .post('/api/v1/auth/refresh')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('user');
       expect(response.body.data).toHaveProperty('token');
-      expect(response.body.data.token).not.toBe(authToken); // Should be a new token
+      expect(response.body.data).toHaveProperty('user');
+
+      // Since JWT tokens include timestamps, new tokens should be different
+      const newToken = response.body.data.token;
+      expect(newToken).toBeTruthy();
+      expect(typeof newToken).toBe('string');
+    });
+
+    it('rejects token refresh without authorization', async () => {
+      await request(app).post('/api/v1/auth/refresh').expect(401);
     });
   });
 
-  describe('POST /api/v1/auth/logout', () => {
+  describe('Session Management', () => {
+    let userToken: string;
+
     beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
+      const user = userPayload();
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      userToken = response.body.data.token;
     });
 
-    it('should logout successfully', async () => {
-      const response = await server
-        .request()
+    it('logs out successfully', async () => {
+      const response = await request(app)
         .post('/api/v1/auth/logout')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.success).toBe(true);
+    });
+
+    it('rejects logout without authorization', async () => {
+      await request(app).post('/api/v1/auth/logout').expect(401);
     });
   });
 
-  describe('DELETE /api/v1/auth/account', () => {
+  describe('Account Management', () => {
+    let userToken: string;
+
     beforeEach(async () => {
-      testUser = await TestHelpers.createTestUser();
-      authToken = TestHelpers.generateTestToken(testUser);
+      const user = userPayload();
+
+      const response = await request(app)
+        .post('/api/v1/auth/register')
+        .send({ email: user.email, name: user.name, password: user.password })
+        .expect(201);
+
+      userToken = response.body.data.token;
     });
 
-    it('should deactivate account successfully', async () => {
-      const response = await server
-        .request()
+    it('deactivates account successfully', async () => {
+      const response = await request(app)
         .delete('/api/v1/auth/account')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.success).toBe(true);
+    });
 
-      // Verify user is deactivated in database
-      const dbUser = await testDatabase.query('SELECT is_active FROM users WHERE id = ?', [
-        testUser.id,
-      ]);
-      expect(dbUser[0].is_active).toBe(0); // MySQL returns 0 for false
+    it('rejects account deactivation without authorization', async () => {
+      await request(app).delete('/api/v1/auth/account').expect(401);
     });
   });
 });

@@ -1,0 +1,501 @@
+openapi: 3.0.3
+info:
+  title: Altus4 Core API
+  version: 0.2.1
+  description: |
+    Public contract for Altus4 backend. This spec standardizes paths, auth, response shapes,
+    and error codes used in integration tests. JWT protects user endpoints; API keys protect
+    search endpoints.
+
+servers:
+  - url: http://localhost:3000
+
+tags:
+  - name: Auth
+  - name: Database
+  - name: API Keys
+  - name: Search
+  - name: Analytics
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      description: Bearer altus4_sk_{env}_{secret}
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [admin, user] }
+        connectedDatabases:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastActive: { type: string, format: date-time }
+    DatabaseConnection:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        host: { type: string }
+        port: { type: integer }
+        database: { type: string }
+        username: { type: string }
+        ssl: { type: boolean }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ApiKey:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        keyPrefix: { type: string }
+        environment: { type: string, enum: [test, live] }
+        permissions:
+          type: array
+          items: { type: string }
+        rateLimitTier: { type: string, enum: [free, pro, enterprise] }
+        rateLimitCustom:
+          type: object
+          additionalProperties: true
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsed:
+          type: string
+          format: date-time
+          nullable: true
+        usageCount: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SearchResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items: { type: object }
+        totalCount: { type: integer }
+        executionTime: { type: integer }
+        searchId: { type: string }
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string, minLength: 2 }
+                role: { type: string, enum: [admin, user] }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user: { $ref: '#/components/schemas/User' }
+                          token: { type: string }
+        '400': { description: Validation or duplicate email }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200': { description: OK }
+        '401': { description: Invalid credentials }
+
+  /api/v1/auth/profile:
+    get:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { description: NO_TOKEN/INVALID_TOKEN }
+        '404': { description: USER_NOT_FOUND }
+    put:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2 }
+                email: { type: string, format: email }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '401': { description: NO_TOKEN/INVALID_TOKEN }
+        '404': { description: USER_NOT_FOUND }
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation or incorrect current password }
+        '401': { description: NO_TOKEN/INVALID_TOKEN }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { description: TOKEN_REFRESH_FAILED }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /api/v1/auth/account:
+    delete:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /api/v1/databases:
+    get:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/DatabaseConnection' }
+    post:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, host, database, username, password]
+              properties:
+                name: { type: string }
+                host: { type: string }
+                port: { type: integer, default: 3306 }
+                database: { type: string }
+                username: { type: string }
+                password: { type: string }
+                ssl: { type: boolean, default: false }
+      responses:
+        '201': { description: Created (password never present in response) }
+        '400': { description: Connection test failed }
+
+  /api/v1/databases/{connectionId}:
+    parameters:
+      - in: path
+        name: connectionId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '404': { description: CONNECTION_NOT_FOUND }
+    put:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                host: { type: string }
+                port: { type: integer }
+                database: { type: string }
+                username: { type: string }
+                password: { type: string }
+                ssl: { type: boolean }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '404': { description: CONNECTION_NOT_FOUND }
+    delete:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '404': { description: CONNECTION_NOT_FOUND }
+
+  /api/v1/databases/{connectionId}/test:
+    post:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '500': { description: Connection not found or failed }
+
+  /api/v1/databases/{connectionId}/schema:
+    get:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '500': { description: Connection not found or discovery failed }
+
+  /api/v1/databases/status:
+    get:
+      tags: [Database]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } },
+          }
+
+  /api/v1/keys:
+    post:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, environment]
+              properties:
+                name: { type: string, minLength: 3 }
+                environment: { type: string, enum: [test, live] }
+                permissions:
+                  type: array
+                  items: { type: string }
+                rateLimitTier: { type: string, enum: [free, pro, enterprise] }
+                rateLimitCustom:
+                  type: object
+                  additionalProperties: true
+                expiresAt: { type: string, format: date-time }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          keyPrefix: { type: string }
+                          secretKey: { type: string }
+                          apiKey: { $ref: '#/components/schemas/ApiKey' }
+        '400': { description: Validation error }
+        '403': { description: INSUFFICIENT_PRIVILEGES }
+    get:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '401': { description: NO_TOKEN/INVALID_TOKEN }
+
+  /api/v1/keys/{keyId}:
+    parameters:
+      - in: path
+        name: keyId
+        required: true
+        schema: { type: string }
+    put:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 3 }
+                permissions:
+                  type: array
+                  items: { type: string }
+                rateLimitTier: { type: string, enum: [free, pro, enterprise] }
+                expiresAt: { type: string, format: date-time, nullable: true }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '404': { description: NOT_FOUND }
+    delete:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK (data.revoked=true) }
+        '404': { description: NOT_FOUND }
+
+  /api/v1/keys/{keyId}/regenerate:
+    post:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '404': { description: NOT_FOUND }
+
+  /api/v1/keys/{keyId}/usage:
+    get:
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        '200': { description: OK }
+        '400': { description: Invalid days }
+        '404': { description: NOT_FOUND }
+
+  /api/v1/search:
+    post:
+      tags: [Search]
+      security: [{ apiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string, minLength: 1, maxLength: 500 }
+                databases:
+                  type: array
+                  items: { type: string }
+                tables:
+                  type: array
+                  items: { type: string }
+                columns:
+                  type: array
+                  items: { type: string }
+                searchMode: { type: string, enum: [natural, boolean, semantic] }
+                limit: { type: integer, minimum: 1, maximum: 100 }
+                offset: { type: integer, minimum: 0 }
+                includeAnalytics: { type: boolean }
+      responses:
+        '200':
+          {
+            description: OK,
+            content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } },
+          }
+        '400': { description: Validation error }
+        '401': { description: INVALID_API_KEY }
+
+  /api/v1/search/suggestions:
+    get:
+      tags: [Search]
+      security: [{ apiKeyAuth: [] }]
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '401': { description: INVALID_API_KEY }
+
+  /api/v1/search/analyze:
+    post:
+      tags: [Search]
+      security: [{ apiKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query, databases]
+              properties:
+                query: { type: string, minLength: 1 }
+                databases:
+                  type: array
+                  minItems: 1
+                  items: { type: string }
+      responses:
+        '200': { description: OK }
+        '400': { description: Validation error }
+        '401': { description: INVALID_API_KEY }

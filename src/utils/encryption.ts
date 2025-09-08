@@ -11,7 +11,17 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+// Ensure we have a valid 32-byte (64-hex) key. In test, provide deterministic fallback.
+const DEFAULT_TEST_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+const ENCRYPTION_KEY = (() => {
+  const { ENCRYPTION_KEY: envKey } = process.env;
+  if (!envKey || envKey.length !== 64 || !/^[0-9a-fA-F]+$/.test(envKey)) {
+    return process.env.NODE_ENV === 'test'
+      ? DEFAULT_TEST_KEY_HEX
+      : crypto.randomBytes(32).toString('hex');
+  }
+  return envKey;
+})();
 const ALGORITHM = 'aes-256-gcm';
 
 export class EncryptionUtil {

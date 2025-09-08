@@ -14,8 +14,8 @@ module.exports = {
   ],
 
   // Setup files
-  setupFiles: ['<rootDir>/tests/env-setup.js'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  setupFiles: ['<rootDir>/tests/setup/env.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup/integration.setup.ts'],
 
   // Coverage configuration
   collectCoverage: false, // Enable with --coverage flag
@@ -168,6 +168,12 @@ module.exports = {
       },
     ],
   },
+
+  // Handle ESM modules like @faker-js/faker
+  transformIgnorePatterns: ['node_modules/(?!(@faker-js/faker)/)'],
+
+  // Module file extensions
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 
   // Test timeout
   testTimeout: 30000,
