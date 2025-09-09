@@ -151,7 +151,7 @@ describe('Rate Limiter Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.1',
+          version: '0.3.0',
         },
       });
       expect(next).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe('Rate Limiter Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'test-request-id',
-          version: '0.2.1',
+          version: '0.3.0',
         },
       });
     });
@@ -328,7 +328,7 @@ describe('Rate Limiter Middleware', () => {
         meta: {
           timestamp: expect.any(Date),
           requestId: 'unknown',
-          version: '0.2.1',
+          version: '0.3.0',
         },
       });
     });
@@ -450,7 +450,7 @@ describe('Rate Limiter Middleware', () => {
           meta: {
             timestamp: expect.any(Date),
             requestId: 'test-request-id',
-            version: '0.2.1',
+            version: '0.3.0',
           },
         });
       });
@@ -512,7 +512,7 @@ describe('Rate Limiter Middleware', () => {
           meta: {
             timestamp: expect.any(Date),
             requestId: 'test-request-id',
-            version: '0.2.1',
+            version: '0.3.0',
           },
         });
       });
@@ -573,7 +573,7 @@ describe('Rate Limiter Middleware', () => {
           meta: {
             timestamp: expect.any(Date),
             requestId: 'test-request-id',
-            version: '0.2.1',
+            version: '0.3.0',
           },
         });
       });

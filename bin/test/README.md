@@ -353,7 +353,7 @@ The script includes security-focused tests:
 
 The script is designed to work with:
 
-- **Altus 4 v0.2.1+** - Current version support
+- **Altus 4 v0.3.0+** - Current version support
 - **OpenAPI 3.0.3** - Specification format
 - **Node.js 20+** - Runtime compatibility
 - **MySQL 8.0+** - Database compatibility

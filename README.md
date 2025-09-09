@@ -57,25 +57,25 @@ Altus 4 includes a Laravel-like migration CLI for managing MySQL schema changes.
 ### Common Commands (npm scripts)
 
 ```bash
-# Run outstanding migrations (Laravel: migrate)
+# Run outstanding migrations
 npm run migrate:run
 
-# Install migrations table if missing (Laravel: migrate:install)
+# Install migrations table if missing
 npm run migrate:install
 
 # Show status (applied/pending + batch)
 npm run migrate:status
 
-# Rollback last batch (Laravel: migrate:rollback)
+# Rollback last batch
 npm run migrate:rollback
 
-# Rollback everything (Laravel: migrate:reset)
+# Rollback everything
 npm run migrate:reset
 
-# Reset and re-run all (Laravel: migrate:refresh)
+# Reset and re-run all
 npm run migrate:refresh
 
-# Drop all tables and re-run (Laravel: migrate:fresh)
+# Drop all tables and re-run
 npm run migrate:fresh
 
 # Run or rollback a specific file
