@@ -3,6 +3,7 @@
  *
  * Provides endpoints for API key management including creation, listing, updating, and revocation.
  * These routes allow users to manage their API keys for B2B service integration.
+ * Uses JWT authentication since users need to be logged in to manage their API keys.
  *
  * Routes:
  *   - POST /api/keys - Create new API key
@@ -23,13 +24,13 @@ const apiKeyController = new ApiKeyController();
 // Apply rate limiting to all API key routes
 router.use(rateLimiter);
 
-// Apply authentication to all routes
+// Apply JWT authentication to all routes
 router.use(authenticate);
 
 /**
  * @route POST /api/keys
  * @desc Create a new API key
- * @access Private (requires valid API key with appropriate permissions)
+ * @access Private (requires JWT authentication)
  */
 router.post('/', async (req, res) => {
   await apiKeyController.createApiKey(req, res);
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
 /**
  * @route GET /api/keys
  * @desc List user's API keys
- * @access Private (requires valid API key)
+ * @access Private (requires JWT authentication)
  */
 router.get('/', async (req, res) => {
   await apiKeyController.listApiKeys(req, res);
@@ -47,7 +48,7 @@ router.get('/', async (req, res) => {
 /**
  * @route PUT /api/keys/:keyId
  * @desc Update an API key's properties
- * @access Private (requires valid API key with admin permission)
+ * @access Private (requires JWT authentication)
  */
 router.put('/:keyId', async (req, res) => {
   await apiKeyController.updateApiKey(req, res);
@@ -56,7 +57,7 @@ router.put('/:keyId', async (req, res) => {
 /**
  * @route DELETE /api/keys/:keyId
  * @desc Revoke (deactivate) an API key
- * @access Private (requires valid API key with admin permission)
+ * @access Private (requires JWT authentication)
  */
 router.delete('/:keyId', async (req, res) => {
   await apiKeyController.revokeApiKey(req, res);
@@ -65,7 +66,7 @@ router.delete('/:keyId', async (req, res) => {
 /**
  * @route GET /api/keys/:keyId/usage
  * @desc Get API key usage statistics
- * @access Private (requires valid API key)
+ * @access Private (requires JWT authentication)
  */
 router.get('/:keyId/usage', async (req, res) => {
   await apiKeyController.getApiKeyUsage(req, res);
@@ -74,7 +75,7 @@ router.get('/:keyId/usage', async (req, res) => {
 /**
  * @route POST /api/keys/:keyId/regenerate
  * @desc Regenerate an API key (creates new secret)
- * @access Private (requires valid API key with admin permission)
+ * @access Private (requires JWT authentication)
  */
 router.post('/:keyId/regenerate', async (req, res) => {
   await apiKeyController.regenerateApiKey(req, res);

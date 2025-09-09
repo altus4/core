@@ -23,18 +23,36 @@ describe('Search Integration (SuperTest + API Key)', () => {
       .expect(201);
     const jwtToken = reg.body.data.token as string;
 
-    // Create database connection
+    // Create API key for database operations (admin permission needed)
+    const adminPermissions = ['admin'];
+    const adminKeyReq = apiKeyPayload({
+      permissions: adminPermissions,
+      environment: 'test',
+      rateLimitTier: 'free',
+    });
+    const createAdminKey = await request(app)
+      .post('/api/v1/keys')
+      .set('Authorization', `Bearer ${jwtToken}`)
+      .send(adminKeyReq)
+      .expect(201);
+    const adminApiKey = createAdminKey.body.data.secretKey as string;
+
+    // Create database connection using admin API key
     const dbPayload = dbConnectionPayload({ host: 'localhost', port: 3306 });
     const createDb = await request(app)
       .post('/api/v1/databases')
-      .set('Authorization', `Bearer ${jwtToken}`)
+      .set('Authorization', `Bearer ${adminApiKey}`)
       .send(dbPayload)
       .expect(201);
     const dbId = createDb.body.data.id as string;
 
-    // Create API key (search permission + optional analytics)
+    // Create API key for search operations (search permission + optional analytics)
     const permissions = withAnalytics ? ['search', 'analytics'] : ['search'];
-    const keyReq = apiKeyPayload({ permissions, environment: 'test', rateLimitTier: 'free' });
+    const keyReq = apiKeyPayload({
+      permissions,
+      environment: 'test',
+      rateLimitTier: 'free',
+    });
     const createKey = await request(app)
       .post('/api/v1/keys')
       .set('Authorization', `Bearer ${jwtToken}`)

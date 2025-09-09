@@ -8,8 +8,8 @@
  *   - Mount this router at /api/v1/analytics in the main server
  */
 import { AnalyticsController } from '@/controllers/AnalyticsController';
-import type { AuthenticatedRequest } from '@/middleware/auth';
-import { authenticate, requireRole } from '@/middleware/auth';
+import type { ApiKeyAuthenticatedRequest } from '@/middleware/apiKeyAuth';
+import { authenticateApiKey, requirePermission } from '@/middleware/apiKeyAuth';
 import { validateRequest } from '@/middleware/validation';
 import type { ApiResponse } from '@/types';
 import { Router } from 'express';
@@ -45,9 +45,10 @@ const searchAnalyticsQuerySchema = z.object({
  */
 router.get(
   '/search-trends',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const trends = await analyticsController.getSearchTrends(req.user!.id, req.query as any);
 
@@ -80,9 +81,10 @@ router.get(
  */
 router.get(
   '/performance',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const performance = await analyticsController.getPerformanceMetrics(
         req.user!.id,
@@ -119,9 +121,10 @@ router.get(
  */
 router.get(
   '/popular-queries',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const queries = await analyticsController.getPopularQueries(req.user!.id, req.query as any);
 
@@ -154,9 +157,10 @@ router.get(
  */
 router.get(
   '/search-history',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: searchAnalyticsQuerySchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const history = await analyticsController.getSearchHistory(req.user!.id, req.query as any);
 
@@ -189,9 +193,10 @@ router.get(
  */
 router.get(
   '/insights',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const insights = await analyticsController.getInsights(req.user!.id, req.query as any);
 
@@ -224,9 +229,10 @@ router.get(
  */
 router.get(
   '/dashboard',
-  authenticate,
+  authenticateApiKey,
+  requirePermission('analytics'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const dashboard = await analyticsController.getDashboardData(req.user!.id, req.query as any);
 
@@ -263,10 +269,10 @@ router.get(
  */
 router.get(
   '/admin/system-overview',
-  authenticate,
-  requireRole('admin'),
+  authenticateApiKey,
+  requirePermission('admin'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const overview = await analyticsController.getSystemOverview(req.query as any);
 
@@ -299,10 +305,10 @@ router.get(
  */
 router.get(
   '/admin/user-activity',
-  authenticate,
-  requireRole('admin'),
+  authenticateApiKey,
+  requirePermission('admin'),
   validateRequest({ query: searchAnalyticsQuerySchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const activity = await analyticsController.getUserActivity(req.query as any);
 
@@ -335,10 +341,10 @@ router.get(
  */
 router.get(
   '/admin/performance-metrics',
-  authenticate,
-  requireRole('admin'),
+  authenticateApiKey,
+  requirePermission('admin'),
   validateRequest({ query: timeRangeSchema }),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: ApiKeyAuthenticatedRequest, res) => {
     try {
       const metrics = await analyticsController.getSystemPerformanceMetrics(req.query as any);
 
