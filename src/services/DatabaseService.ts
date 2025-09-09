@@ -234,7 +234,16 @@ export class DatabaseService {
   }
 
   /**
-   * Execute full-text search query
+   * Execute full-text search query across specified tables and columns.
+   * Builds and executes MySQL FULLTEXT search queries for each table with proper indexes.
+   *
+   * @param connectionId - Database connection identifier
+   * @param query - Search query string to execute
+   * @param tables - Array of table names to search in
+   * @param columns - Optional array of specific columns to search (defaults to all indexed columns)
+   * @param limit - Maximum number of results to return per table
+   * @param offset - Number of results to skip for pagination
+   * @returns Array of search results from all matching tables
    */
   public async executeFullTextSearch(
     connectionId: string,
@@ -250,6 +259,7 @@ export class DatabaseService {
       const searchQueries: string[] = [];
       const searchParams: any[] = [];
 
+      // Build search queries for each table
       for (const table of tables) {
         // Get full-text indexed columns for this table
         const [indexes] = await connection.execute<RowDataPacket[]>(
@@ -257,15 +267,18 @@ export class DatabaseService {
           [table, 'FULLTEXT']
         );
 
+        // Skip tables without full-text indexes
         if (indexes.length === 0) {
           logger.warn(`No full-text indexes found for table: ${table}`);
           continue;
         }
 
-        // Group columns by index name
+        // Group columns by index name to handle composite indexes
         const indexGroups = this.groupIndexesByName(indexes);
 
+        // Create search query for each full-text index
         for (const index of indexGroups) {
+          // Filter columns if specific ones were requested
           const columnsToSearch = columns
             ? index.columns.filter(col => columns.includes(col))
             : index.columns;
@@ -274,9 +287,11 @@ export class DatabaseService {
             continue;
           }
 
+          // Build column lists for SELECT and MATCH clauses
           const columnList = columnsToSearch.join(', ');
           const selectColumns = columnsToSearch.map(col => `${col}`).join(', ');
 
+          // Construct MySQL FULLTEXT search query with relevance scoring
           const searchQuery = `
             SELECT
               '${table}' as table_name,
@@ -287,15 +302,17 @@ export class DatabaseService {
           `;
 
           searchQueries.push(searchQuery);
+          // Add query parameters twice: once for SELECT, once for WHERE
           searchParams.push(query, query);
         }
       }
 
+      // Return empty results if no searchable tables found
       if (searchQueries.length === 0) {
         return [];
       }
 
-      // Combine all search queries with UNION and order by relevance
+      // Combine all search queries with UNION ALL and order by relevance score
       const combinedQuery = `
         ${searchQueries.join(' UNION ALL ')}
         ORDER BY relevance_score DESC

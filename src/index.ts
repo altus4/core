@@ -32,8 +32,13 @@ class AltusServer {
    */
   constructor() {
     this.app = createApp();
+    this.setupErrorHandling();
   }
 
+  /**
+   * Sets up global error handling for unhandled promises and uncaught exceptions.
+   * Logs errors appropriately and exits gracefully on critical errors.
+   */
   private setupErrorHandling(): void {
     // Handle unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
@@ -47,6 +52,12 @@ class AltusServer {
     });
   }
 
+  /**
+   * Starts the HTTP server and sets up graceful shutdown handlers.
+   * Binds to the configured port and logs startup information.
+   *
+   * @throws Error if server fails to start
+   */
   public async start(): Promise<void> {
     try {
       const port = config.port || 3000;
@@ -68,10 +79,20 @@ class AltusServer {
     }
   }
 
+  /**
+   * Gets the Express application instance.
+   * Useful for testing and external access to the app.
+   *
+   * @returns The Express application instance
+   */
   public getApp() {
     return this.app;
   }
 
+  /**
+   * Performs graceful shutdown of the server.
+   * Closes the HTTP server and allows existing connections to finish.
+   */
   private async gracefulShutdown(): Promise<void> {
     logger.info('🛑 Graceful shutdown initiated...');
 

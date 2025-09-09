@@ -1,3 +1,15 @@
+/**
+ * Application Factory
+ *
+ * Creates and configures the Express application instance with middleware, routes, and error handling.
+ * Sets up security, logging, CORS, rate limiting, and API endpoints for Altus4.
+ * Provides a factory function to create the app for both server and testing.
+ *
+ * Usage:
+ *   - Call createApp() to get a configured Express application
+ *   - Mount API routes under /api/v1 with proper middleware
+ *   - Includes health check endpoint for monitoring
+ */
 import { config } from '@/config';
 import { errorHandler } from '@/middleware/errorHandler';
 import { rateLimiter } from '@/middleware/rateLimiter';
@@ -16,6 +28,12 @@ import helmet from 'helmet';
 // Load environment variables from .env file
 dotenv.config();
 
+/**
+ * Creates and configures an Express application with all necessary middleware, routes, and error handling.
+ * Sets up security headers, CORS, rate limiting, request logging, and API endpoints.
+ *
+ * @returns Express application instance ready to start serving requests
+ */
 export function createApp(): express.Application {
   const app = express();
 
@@ -49,7 +67,7 @@ export function createApp(): express.Application {
     });
   });
 
-  // API routes
+  // API routes - organize all v1 endpoints under /api/v1
   const apiV1 = express.Router();
   apiV1.use('/auth', authRoutes);
   apiV1.use('/search', searchRoutes);
