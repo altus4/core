@@ -48,61 +48,85 @@ npm run dev:stop         # Stop Docker services
 
 ## Database Migrations
 
-Altus 4 includes a migration system for managing your MySQL schema changes.
+Altus 4 includes a Laravel-like migration CLI for managing MySQL schema changes.
 
-- Migration SQL files are stored in the `migrations/` directory
-- Each migration consists of an `up` script (e.g., `001_create_users_table.up.sql`) and a corresponding `down` script (e.g., `001_create_users_table.down.sql`)
-- The migration tool automatically uses your environment variables for database connectivity
+- SQL files live in `migrations/`
+- Each migration has a pair: `XYZ_name.up.sql` and `XYZ_name.down.sql`
+- The CLI loads `.env` automatically and records state in a `migrations` table
 
-### Usage
-
-Run migrations using npm scripts:
+### Common Commands (npm scripts)
 
 ```bash
-# Apply all migrations (up)
-npm run migrate
+# Run outstanding migrations (Laravel: migrate)
+npm run migrate:run
 
-# Apply all migrations (explicit up)
-npm run migrate:up
+# Install migrations table if missing (Laravel: migrate:install)
+npm run migrate:install
 
-# Revert all migrations (down)
-npm run migrate:down
-
-# Show migration status
+# Show status (applied/pending + batch)
 npm run migrate:status
+
+# Rollback last batch (Laravel: migrate:rollback)
+npm run migrate:rollback
+
+# Rollback everything (Laravel: migrate:reset)
+npm run migrate:reset
+
+# Reset and re-run all (Laravel: migrate:refresh)
+npm run migrate:refresh
+
+# Drop all tables and re-run (Laravel: migrate:fresh)
+npm run migrate:fresh
+
+# Run or rollback a specific file
+./bin/migrate migrate:up --file 001_create_users_table
+./bin/migrate migrate:down --file 001_create_users_table
+
+# Convenience alias retained for compatibility
+npm run migrate          # equivalent to "up" (legacy alias)
 ```
 
-### Environment Configuration
-
-The migration system uses the same environment variables as the application:
+### CLI Options
 
 ```bash
-# Required environment variables
-DB_HOST=localhost        # Database host
-DB_PORT=3306            # Database port (optional, defaults to 3306)
-DB_USERNAME=altus4_user # Database username
-DB_PASSWORD=password    # Database password
-DB_DATABASE=altus4_meta # Database name
+./bin/migrate <command> [options]
+
+--path <dir>       Directory of migrations (default: migrations)
+--database <name>  Override DB name (uses DB_DATABASE by default)
+--step             For migrate: put each file in its own batch
+--pretend          Print SQL without executing
+--seed             Run SQL seeds from <path>/seeds after migrate/refresh/fresh
+--force            Allow in production (APP_ENV=production)
+--file <name>      For up/down: base name (e.g. 001_create_users_table)
+--batch <n>        For rollback: only the given batch
+--step <n>         For rollback: number of files to rollback
+--drop-views       For fresh: also drop database views
 ```
 
-You can set these in your `.env` file or as environment variables. The migration script will automatically load your `.env` file if it exists.
+Behavior notes:
 
-### Manual Script Usage
+- `migrate:down` without `--file` rolls back a single file (the most recent). Use `migrate:rollback` to revert the last batch, `migrate:reset` for everything, or `migrate:fresh` to drop all tables and re-run.
+- In production (`APP_ENV=production`), destructive commands require `--force`.
+- If `DB_HOST=localhost`, the CLI forces TCP via `127.0.0.1`. To use a socket, set `DB_SOCKET` in `.env`.
+- You can override the migrations table name via `MIGRATIONS_TABLE` env (default `migrations`).
+- Seeds: place `.sql` files under `migrations/seeds/` to run them in filename order with `--seed`.
 
-You can also run the migration script directly:
+### Environment Variables
+
+The migration CLI uses the same `.env` as the app:
 
 ```bash
-# Apply all migrations
-./bin/migrate up
-
-# Revert all migrations
-./bin/migrate down
-
-# Show detailed migration status
-./bin/migrate status
+DB_HOST=127.0.0.1       # or set DB_SOCKET for socket connections
+DB_PORT=3306
+DB_USERNAME=altus4_user
+DB_PASSWORD=your_password
+DB_DATABASE=altus4
+APP_ENV=development     # production requires --force for destructive ops
+# Optional: override migrations table
+MIGRATIONS_TABLE=migrations
 ```
 
-**Note:** Ensure your database exists before running migrations. The migration system will not create the database automatically.
+Ensure the database exists before running migrations; the CLI won’t create the database itself.
 
 **For comprehensive documentation, see the [`/docs`](./docs) directory.**
 
