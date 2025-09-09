@@ -54,7 +54,7 @@ router.get('/', authenticate, async (req: AuthenticatedRequest, res) => {
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 
@@ -88,7 +88,7 @@ router.post(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -120,7 +120,7 @@ router.get('/status', authenticate, async (req: AuthenticatedRequest, res) => {
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 
@@ -163,7 +163,7 @@ router.get('/:connectionId', authenticate, async (req: AuthenticatedRequest, res
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 
@@ -211,7 +211,7 @@ router.put(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -255,7 +255,7 @@ router.delete('/:connectionId', authenticate, async (req: AuthenticatedRequest, 
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 
@@ -285,7 +285,7 @@ router.post('/:connectionId/test', authenticate, async (req: AuthenticatedReques
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 
@@ -315,7 +315,7 @@ router.get('/:connectionId/schema', authenticate, async (req: AuthenticatedReque
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     };
 

@@ -3,19 +3,33 @@ info:
   title: Altus4 Core API
   version: 0.3.0
   description: |
-    Public contract for Altus4 backend. This spec standardizes paths, auth, response shapes,
-    and error codes used in integration tests. JWT protects user endpoints; API keys protect
-    search endpoints.
+    Complete API specification for Altus4 - AI-Enhanced MySQL Full-Text Search Engine.
+
+    ## Authentication
+
+    Altus4 uses dual authentication:
+    - **JWT Bearer Tokens**: For user management, API key management, database management, and analytics
+    - **API Key Bearer Tokens**: For search operations and B2B service integration
+
+    API Key format: `altus4_sk_{env}_{secret}` where env is 'test' or 'live'.
 
 servers:
   - url: http://localhost:3000
+    description: Local development server
 
 tags:
   - name: Auth
-  - name: Database
+    description: User authentication and profile management
+  - name: Management
+    description: System management and setup operations
   - name: API Keys
+    description: API key management for B2B integration
+  - name: Database
+    description: Database connection management
   - name: Search
+    description: Search operations with AI enhancement
   - name: Analytics
+    description: Search analytics and insights
 
 components:
   securitySchemes:
@@ -23,66 +37,94 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JWT token for user authentication
     apiKeyAuth:
       type: http
       scheme: bearer
-      description: Bearer altus4_sk_{env}_{secret}
+      description: API key for search operations (format altus4_sk_{env}_{secret})
+
   schemas:
     ApiResponse:
       type: object
+      required: [success]
       properties:
         success:
           type: boolean
+          description: Indicates if the request was successful
         data:
-          nullable: true
+          description: Response data (varies by endpoint)
         error:
-          nullable: true
           type: object
           properties:
             code:
               type: string
+              description: Error code for programmatic handling
             message:
               type: string
+              description: Human-readable error message
+            details:
+              description: Additional error details
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            requestId:
+              type: string
+            version:
+              type: string
+            executionTime:
+              type: number
+              description: Request execution time in milliseconds
+
     User:
       type: object
       properties:
-        id: { type: string }
-        email: { type: string }
-        name: { type: string }
-        role: { type: string, enum: [admin, user] }
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
         connectedDatabases:
           type: array
-          items: { type: string }
-        createdAt: { type: string, format: date-time }
-        lastActive: { type: string, format: date-time }
-    DatabaseConnection:
-      type: object
-      properties:
-        id: { type: string }
-        name: { type: string }
-        host: { type: string }
-        port: { type: integer }
-        database: { type: string }
-        username: { type: string }
-        ssl: { type: boolean }
-        isActive: { type: boolean }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastActive:
+          type: string
+          format: date-time
+
     ApiKey:
       type: object
       properties:
-        id: { type: string }
-        name: { type: string }
-        keyPrefix: { type: string }
-        environment: { type: string, enum: [test, live] }
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        keyPrefix:
+          type: string
+          description: Public prefix of the API key
+        environment:
+          type: string
+          enum: [test, live]
         permissions:
           type: array
-          items: { type: string }
-        rateLimitTier: { type: string, enum: [free, pro, enterprise] }
-        rateLimitCustom:
-          type: object
-          additionalProperties: true
-          nullable: true
+          items:
+            type: string
+            enum: [search, analytics, admin]
+        rateLimitTier:
+          type: string
+          enum: [free, pro, enterprise]
         expiresAt:
           type: string
           format: date-time
@@ -91,24 +133,290 @@ components:
           type: string
           format: date-time
           nullable: true
-        usageCount: { type: integer }
-        isActive: { type: boolean }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-    SearchResult:
+        lastUsedIp:
+          type: string
+          nullable: true
+        usageCount:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    DatabaseConnection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+        databaseName:
+          type: string
+        username:
+          type: string
+        sslEnabled:
+          type: boolean
+        isActive:
+          type: boolean
+        connectionStatus:
+          type: string
+          enum: [connected, disconnected, error]
+        lastTested:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Search query text
+        databases:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Database IDs to search in
+        tables:
+          type: array
+          items:
+            type: string
+          description: Specific table names to search
+        columns:
+          type: array
+          items:
+            type: string
+          description: Specific column names to search
+        searchMode:
+          type: string
+          enum: [natural, boolean, semantic]
+          default: natural
+          description: Search mode to use
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Maximum number of results
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of results to skip
+        includeAnalytics:
+          type: boolean
+          default: false
+          description: Include analytics data in response
+
+    SearchResponse:
       type: object
       properties:
         results:
           type: array
-          items: { type: object }
-        totalCount: { type: integer }
-        executionTime: { type: integer }
-        searchId: { type: string }
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              database:
+                type: string
+              table:
+                type: string
+              relevanceScore:
+                type: number
+              content:
+                type: object
+              highlights:
+                type: array
+                items:
+                  type: string
+        totalCount:
+          type: integer
+        executionTime:
+          type: number
+        analytics:
+          type: object
+          description: Analytics data if requested
+
+  responses:
+    BadRequest:
+      description: Bad Request - Validation error
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: VALIDATION_ERROR
+                      message:
+                        type: string
+                        example: Invalid request parameters
+
+    Unauthorized:
+      description: Unauthorized - Missing or invalid token
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: INVALID_API_KEY
+                      message:
+                        type: string
+                        example: Missing or invalid API key
+
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: INSUFFICIENT_PERMISSIONS
+                      message:
+                        type: string
+                        example: API key lacks required permissions
+
+    NotFound:
+      description: Not Found - Resource not found
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: NOT_FOUND
+                      message:
+                        type: string
+                        example: Resource not found
+
+    RateLimitExceeded:
+      description: Too Many Requests - Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: RATE_LIMIT_EXCEEDED
+                      message:
+                        type: string
+                        example: Rate limit exceeded. Try again in 45 seconds.
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: INTERNAL_ERROR
+                      message:
+                        type: string
+                        example: Internal server error
 
 paths:
+  # Health Check
+  /health:
+    get:
+      tags: [Management]
+      summary: System health check
+      description: Check if the system is running and healthy
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: '0.3.0'
+                  uptime:
+                    type: number
+
+  # Authentication Endpoints
   /api/v1/auth/register:
     post:
       tags: [Auth]
+      summary: Register new user account
+      description: Create a new user account with email and password
       requestBody:
         required: true
         content:
@@ -117,13 +425,22 @@ paths:
               type: object
               required: [email, password, name]
               properties:
-                email: { type: string, format: email }
-                password: { type: string, minLength: 8 }
-                name: { type: string, minLength: 2 }
-                role: { type: string, enum: [admin, user] }
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                name:
+                  type: string
+                  minLength: 2
+                role:
+                  type: string
+                  enum: [admin, user]
+                  default: user
       responses:
         '201':
-          description: Created
+          description: User created successfully
           content:
             application/json:
               schema:
@@ -134,13 +451,40 @@ paths:
                       data:
                         type: object
                         properties:
-                          user: { $ref: '#/components/schemas/User' }
-                          token: { type: string }
-        '400': { description: Validation or duplicate email }
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+                            description: JWT token for authentication
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            example: USER_EXISTS
+                          message:
+                            type: string
+                            example: User with this email already exists
 
   /api/v1/auth/login:
     post:
       tags: [Auth]
+      summary: User login
+      description: Authenticate user and receive JWT token
       requestBody:
         required: true
         content:
@@ -149,23 +493,83 @@ paths:
               type: object
               required: [email, password]
               properties:
-                email: { type: string, format: email }
-                password: { type: string }
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
       responses:
-        '200': { description: OK }
-        '401': { description: Invalid credentials }
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+                            description: JWT token for authentication
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            example: INVALID_CREDENTIALS
+                          message:
+                            type: string
+                            example: Invalid email or password
 
   /api/v1/auth/profile:
     get:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
+      summary: Get user profile
+      description: Get the authenticated user's profile information
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK }
-        '401': { description: NO_TOKEN/INVALID_TOKEN }
-        '404': { description: USER_NOT_FOUND }
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
     put:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
+      summary: Update user profile
+      description: Update the authenticated user's profile information
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -173,18 +577,36 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, minLength: 2 }
-                email: { type: string, format: email }
+                name:
+                  type: string
+                  minLength: 2
+                email:
+                  type: string
+                  format: email
       responses:
-        '200': { description: OK }
-        '400': { description: Validation error }
-        '401': { description: NO_TOKEN/INVALID_TOKEN }
-        '404': { description: USER_NOT_FOUND }
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/auth/change-password:
     post:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
+      summary: Change password
+      description: Change the authenticated user's password
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -193,42 +615,285 @@ paths:
               type: object
               required: [currentPassword, newPassword]
               properties:
-                currentPassword: { type: string }
-                newPassword: { type: string, minLength: 8 }
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
       responses:
-        '200': { description: OK }
-        '400': { description: Validation or incorrect current password }
-        '401': { description: NO_TOKEN/INVALID_TOKEN }
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Password changed successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/auth/refresh:
     post:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
+      summary: Refresh JWT token
+      description: Refresh the authentication token
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK }
-        '401': { description: TOKEN_REFRESH_FAILED }
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                            description: New JWT token
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/auth/logout:
     post:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
+      summary: User logout
+      description: Logout the authenticated user
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK }
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/auth/account:
     delete:
       tags: [Auth]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-
-  /api/v1/databases:
-    get:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
+      summary: Deactivate account
+      description: Deactivate the authenticated user's account
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: OK
+          description: Account deactivated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Account deactivated successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Management Endpoints
+  /api/v1/management/setup:
+    post:
+      tags: [Management]
+      summary: Create first API key
+      description: Create the initial API key for a new user account
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: First API key created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          apiKey:
+                            $ref: '#/components/schemas/ApiKey'
+                          secretKey:
+                            type: string
+                            description: Full API key (only shown once)
+                          warning:
+                            type: string
+                            example: This is the only time the full API key will be shown. Please store it securely.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: API key already exists
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      success:
+                        type: boolean
+                        example: false
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            type: string
+                            example: API_KEY_EXISTS
+                          message:
+                            type: string
+                            example: API key already exists for this user
+
+  /api/v1/management/health:
+    get:
+      tags: [Management]
+      summary: Management service health
+      description: Check the health of the management service
+      responses:
+        '200':
+          description: Management service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /api/v1/management/migration-status:
+    get:
+      tags: [Management]
+      summary: Database migration status
+      description: Get the current database migration status
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Migration status retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          currentVersion:
+                            type: string
+                          appliedMigrations:
+                            type: array
+                            items:
+                              type: string
+                          pendingMigrations:
+                            type: array
+                            items:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # API Key Management Endpoints
+  /api/v1/keys:
+    post:
+      tags: [API Keys]
+      summary: Create new API key
+      description: Create a new API key for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, environment]
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
+                environment:
+                  type: string
+                  enum: [test, live]
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum: [search, analytics, admin]
+                  default: [search]
+                rateLimitTier:
+                  type: string
+                  enum: [free, pro, enterprise]
+                  default: free
+                expiresAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          apiKey:
+                            $ref: '#/components/schemas/ApiKey'
+                          secretKey:
+                            type: string
+                            description: Full API key (only shown once)
+                          warning:
+                            type: string
+                            example: This is the only time the full API key will be shown. Please store it securely.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [API Keys]
+      summary: List API keys
+      description: Get a list of all API keys for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API keys retrieved successfully
           content:
             application/json:
               schema:
@@ -238,121 +903,80 @@ paths:
                     properties:
                       data:
                         type: array
-                        items: { $ref: '#/components/schemas/DatabaseConnection' }
-    post:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, host, database, username, password]
-              properties:
-                name: { type: string }
-                host: { type: string }
-                port: { type: integer, default: 3306 }
-                database: { type: string }
-                username: { type: string }
-                password: { type: string }
-                ssl: { type: boolean, default: false }
-      responses:
-        '201': { description: Created (password never present in response) }
-        '400': { description: Connection test failed }
+                        items:
+                          $ref: '#/components/schemas/ApiKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/databases/{connectionId}:
+  /api/v1/keys/{keyId}:
     parameters:
       - in: path
-        name: connectionId
+        name: keyId
         required: true
-        schema: { type: string }
-    get:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-        '404': { description: CONNECTION_NOT_FOUND }
+        schema:
+          type: string
+          format: uuid
+        description: API key ID
+
     put:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name: { type: string }
-                host: { type: string }
-                port: { type: integer }
-                database: { type: string }
-                username: { type: string }
-                password: { type: string }
-                ssl: { type: boolean }
-      responses:
-        '200': { description: OK }
-        '400': { description: Validation error }
-        '404': { description: CONNECTION_NOT_FOUND }
-    delete:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-        '404': { description: CONNECTION_NOT_FOUND }
-
-  /api/v1/databases/{connectionId}/test:
-    post:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-        '500': { description: Connection not found or failed }
-
-  /api/v1/databases/{connectionId}/schema:
-    get:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-        '500': { description: Connection not found or discovery failed }
-
-  /api/v1/databases/status:
-    get:
-      tags: [Database]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200':
-          {
-            description: OK,
-            content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } },
-          }
-
-  /api/v1/keys:
-    post:
       tags: [API Keys]
-      security: [{ bearerAuth: [] }]
+      summary: Update API key
+      description: Update an existing API key's properties
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name, environment]
               properties:
-                name: { type: string, minLength: 3 }
-                environment: { type: string, enum: [test, live] }
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 255
                 permissions:
                   type: array
-                  items: { type: string }
-                rateLimitTier: { type: string, enum: [free, pro, enterprise] }
-                rateLimitCustom:
-                  type: object
-                  additionalProperties: true
-                expiresAt: { type: string, format: date-time }
+                  items:
+                    type: string
+                    enum: [search, analytics, admin]
+                rateLimitTier:
+                  type: string
+                  enum: [free, pro, enterprise]
+                expiresAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+                isActive:
+                  type: boolean
       responses:
-        '201':
-          description: Created
+        '200':
+          description: API key updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ApiKey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [API Keys]
+      summary: Revoke API key
+      description: Revoke (deactivate) an API key
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API key revoked successfully
           content:
             application/json:
               schema:
@@ -363,27 +987,276 @@ paths:
                       data:
                         type: object
                         properties:
-                          keyPrefix: { type: string }
-                          secretKey: { type: string }
-                          apiKey: { $ref: '#/components/schemas/ApiKey' }
-        '400': { description: Validation error }
-        '403': { description: INSUFFICIENT_PRIVILEGES }
-    get:
-      tags: [API Keys]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: OK }
-        '401': { description: NO_TOKEN/INVALID_TOKEN }
+                          revoked:
+                            type: boolean
+                            example: true
+                          message:
+                            type: string
+                            example: API key revoked successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  /api/v1/keys/{keyId}:
+  /api/v1/keys/{keyId}/usage:
     parameters:
       - in: path
         name: keyId
         required: true
-        schema: { type: string }
-    put:
+        schema:
+          type: string
+          format: uuid
+        description: API key ID
+
+    get:
       tags: [API Keys]
-      security: [{ bearerAuth: [] }]
+      summary: Get API key usage statistics
+      description: Get usage statistics for an API key
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+          description: Number of days to include in statistics
+      responses:
+        '200':
+          description: Usage statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalRequests:
+                            type: integer
+                          requestsByDay:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date:
+                                  type: string
+                                  format: date
+                                requests:
+                                  type: integer
+                          averageResponseTime:
+                            type: number
+                          errorRate:
+                            type: number
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/keys/{keyId}/regenerate:
+    parameters:
+      - in: path
+        name: keyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: API key ID
+
+    post:
+      tags: [API Keys]
+      summary: Regenerate API key
+      description: Generate a new secret for an existing API key
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: API key regenerated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          apiKey:
+                            $ref: '#/components/schemas/ApiKey'
+                          secretKey:
+                            type: string
+                            description: New full API key (only shown once)
+                          warning:
+                            type: string
+                            example: This is the only time the new API key will be shown. Please store it securely.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Database Management Endpoints
+  /api/v1/databases:
+    get:
+      tags: [Database]
+      summary: List database connections
+      description: Get all database connections for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Database connections retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DatabaseConnection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Database]
+      summary: Add database connection
+      description: Add a new database connection for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, host, database, username]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                host:
+                  type: string
+                  minLength: 1
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                  default: 3306
+                database:
+                  type: string
+                  minLength: 1
+                username:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  description: Database password (will be encrypted)
+                ssl:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Database connection added successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DatabaseConnection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/databases/status:
+    get:
+      tags: [Database]
+      summary: Get connection statuses
+      description: Get connection status for all user databases
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Connection statuses retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            status:
+                              type: string
+                              enum: [connected, disconnected, error]
+                            lastTested:
+                              type: string
+                              format: date-time
+                              nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/databases/{connectionId}:
+    parameters:
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Database connection ID
+
+    get:
+      tags: [Database]
+      summary: Get database connection
+      description: Get details of a specific database connection
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Database connection retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DatabaseConnection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Database]
+      summary: Update database connection
+      description: Update an existing database connection
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -391,48 +1264,288 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, minLength: 3 }
-                permissions:
-                  type: array
-                  items: { type: string }
-                rateLimitTier: { type: string, enum: [free, pro, enterprise] }
-                expiresAt: { type: string, format: date-time, nullable: true }
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                host:
+                  type: string
+                  minLength: 1
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                database:
+                  type: string
+                  minLength: 1
+                username:
+                  type: string
+                  minLength: 1
+                password:
+                  type: string
+                  description: Database password (will be encrypted)
+                ssl:
+                  type: boolean
+                isActive:
+                  type: boolean
       responses:
-        '200': { description: OK }
-        '400': { description: Validation error }
-        '404': { description: NOT_FOUND }
+        '200':
+          description: Database connection updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DatabaseConnection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
     delete:
-      tags: [API Keys]
-      security: [{ bearerAuth: [] }]
+      tags: [Database]
+      summary: Remove database connection
+      description: Remove a database connection
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK (data.revoked=true) }
-        '404': { description: NOT_FOUND }
+        '200':
+          description: Database connection removed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Database connection removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  /api/v1/keys/{keyId}/regenerate:
+  /api/v1/databases/{connectionId}/test:
+    parameters:
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Database connection ID
+
     post:
-      tags: [API Keys]
-      security: [{ bearerAuth: [] }]
+      tags: [Database]
+      summary: Test database connection
+      description: Test connectivity to a database
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK }
-        '404': { description: NOT_FOUND }
+        '200':
+          description: Connection test completed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [connected, disconnected, error]
+                          message:
+                            type: string
+                          responseTime:
+                            type: number
+                            description: Response time in milliseconds
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
-  /api/v1/keys/{keyId}/usage:
+  /api/v1/databases/{connectionId}/schema:
+    parameters:
+      - in: path
+        name: connectionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Database connection ID
+
     get:
-      tags: [API Keys]
-      security: [{ bearerAuth: [] }]
-      parameters:
-        - in: query
-          name: days
-          schema: { type: integer, minimum: 1, maximum: 365 }
+      tags: [Database]
+      summary: Get database schema
+      description: Discover and return the schema of a connected database
+      security:
+        - bearerAuth: []
       responses:
-        '200': { description: OK }
-        '400': { description: Invalid days }
-        '404': { description: NOT_FOUND }
+        '200':
+          description: Database schema retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tables:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                columns:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                      type:
+                                        type: string
+                                      nullable:
+                                        type: boolean
+                                      key:
+                                        type: string
+                                fulltextIndexes:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                      columns:
+                                        type: array
+                                        items:
+                                          type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
+  # Search Endpoints
   /api/v1/search:
     post:
       tags: [Search]
-      security: [{ apiKeyAuth: [] }]
+      summary: Execute search
+      description: Execute a search across specified databases with AI enhancements
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search executed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/search/suggestions:
+    get:
+      tags: [Search]
+      summary: Get search suggestions
+      description: Get search suggestions based on partial query input
+      security:
+        - apiKeyAuth: []
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Partial query for suggestions
+        - in: query
+          name: databases
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          description: Database IDs to get suggestions from
+        - in: query
+          name: tables
+          schema:
+            type: array
+            items:
+              type: string
+          description: Specific tables to get suggestions from
+      responses:
+        '200':
+          description: Suggestions retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          suggestions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                text:
+                                  type: string
+                                relevance:
+                                  type: number
+                                type:
+                                  type: string
+                                  enum: [query, table, column]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/search/analyze:
+    post:
+      tags: [Search]
+      summary: Analyze query performance
+      description: Analyze a query for performance and get optimization suggestions
+      security:
+        - apiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -441,61 +1554,631 @@ paths:
               type: object
               required: [query]
               properties:
-                query: { type: string, minLength: 1, maxLength: 500 }
+                query:
+                  type: string
+                  minLength: 1
                 databases:
                   type: array
-                  items: { type: string }
-                tables:
-                  type: array
-                  items: { type: string }
-                columns:
-                  type: array
-                  items: { type: string }
-                searchMode: { type: string, enum: [natural, boolean, semantic] }
-                limit: { type: integer, minimum: 1, maximum: 100 }
-                offset: { type: integer, minimum: 0 }
-                includeAnalytics: { type: boolean }
+                  items:
+                    type: string
+                    format: uuid
       responses:
         '200':
-          {
-            description: OK,
-            content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponse' } } },
-          }
-        '400': { description: Validation error }
-        '401': { description: INVALID_API_KEY }
+          description: Query analysis completed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          query:
+                            type: string
+                          analyzedQuery:
+                            type: string
+                          performance:
+                            type: object
+                            properties:
+                              estimatedTime:
+                                type: number
+                              indexUsage:
+                                type: array
+                                items:
+                                  type: string
+                              recommendations:
+                                type: array
+                                items:
+                                  type: string
+                          aiInsights:
+                            type: array
+                            items:
+                              type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
-  /api/v1/search/suggestions:
+  /api/v1/search/trends:
     get:
       tags: [Search]
-      security: [{ apiKeyAuth: [] }]
+      summary: Get search trends
+      description: Get search trends for the authenticated API key user
+      security:
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Search trends retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalSearches:
+                            type: integer
+                          popularQueries:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                query:
+                                  type: string
+                                count:
+                                  type: integer
+                          searchesByDay:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date:
+                                  type: string
+                                  format: date
+                                count:
+                                  type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/search/history:
+    get:
+      tags: [Search]
+      summary: Get search history
+      description: Get search history for the authenticated API key user
+      security:
+        - apiKeyAuth: []
       parameters:
         - in: query
-          name: query
-          required: true
-          schema: { type: string, minLength: 1, maxLength: 100 }
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of results
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of results to skip
       responses:
-        '200': { description: OK }
-        '400': { description: Validation error }
-        '401': { description: INVALID_API_KEY }
+        '200':
+          description: Search history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            query:
+                              type: string
+                            searchMode:
+                              type: string
+                            resultCount:
+                              type: integer
+                            executionTime:
+                              type: number
+                            createdAt:
+                              type: string
+                              format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/search/analyze:
-    post:
-      tags: [Search]
-      security: [{ apiKeyAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [query, databases]
-              properties:
-                query: { type: string, minLength: 1 }
-                databases:
-                  type: array
-                  minItems: 1
-                  items: { type: string }
+  # Analytics Endpoints
+  /api/v1/analytics/search-trends:
+    get:
+      tags: [Analytics]
+      summary: Get search trends analytics
+      description: Get detailed search trends and analytics data
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+          description: Start date for the analytics period
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+          description: End date for the analytics period
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [day, week, month, 3months, 6months, year]
+            default: week
+          description: Analytics period grouping
       responses:
-        '200': { description: OK }
-        '400': { description: Validation error }
-        '401': { description: INVALID_API_KEY }
+        '200':
+          description: Search trends analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          totalSearches:
+                            type: integer
+                          averageResultsPerSearch:
+                            type: number
+                          trendsData:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date:
+                                  type: string
+                                  format: date
+                                searches:
+                                  type: integer
+                                averageResponseTime:
+                                  type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/performance:
+    get:
+      tags: [Analytics]
+      summary: Get performance metrics
+      description: Get detailed performance metrics and analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [day, week, month, 3months, 6months, year]
+            default: week
+      responses:
+        '200':
+          description: Performance metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          averageResponseTime:
+                            type: number
+                          p95ResponseTime:
+                            type: number
+                          errorRate:
+                            type: number
+                          throughput:
+                            type: number
+                          performanceData:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date:
+                                  type: string
+                                  format: date
+                                averageResponseTime:
+                                  type: number
+                                errorRate:
+                                  type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/popular-queries:
+    get:
+      tags: [Analytics]
+      summary: Get popular queries
+      description: Get the most popular search queries
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [day, week, month, 3months, 6months, year]
+            default: week
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Popular queries retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            query:
+                              type: string
+                            count:
+                              type: integer
+                            averageResponseTime:
+                              type: number
+                            successRate:
+                              type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/search-history:
+    get:
+      tags: [Analytics]
+      summary: Get detailed search history
+      description: Get detailed search history with analytics data
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Search history retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          searches:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                query:
+                                  type: string
+                                searchMode:
+                                  type: string
+                                resultCount:
+                                  type: integer
+                                executionTime:
+                                  type: number
+                                satisfaction:
+                                  type: number
+                                  nullable: true
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                          totalCount:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/insights:
+    get:
+      tags: [Analytics]
+      summary: Get AI-generated insights
+      description: Get AI-generated insights about search patterns and performance
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: AI insights retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          insights:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                title:
+                                  type: string
+                                description:
+                                  type: string
+                                type:
+                                  type: string
+                                  enum: [performance, usage, trend, recommendation]
+                                confidence:
+                                  type: number
+                                  minimum: 0
+                                  maximum: 1
+                          generatedAt:
+                            type: string
+                            format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Get dashboard data
+      description: Get comprehensive dashboard data for analytics overview
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          summary:
+                            type: object
+                            properties:
+                              totalSearches:
+                                type: integer
+                              averageResponseTime:
+                                type: number
+                              connectedDatabases:
+                                type: integer
+                              activeApiKeys:
+                                type: integer
+                          recentActivity:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                description:
+                                  type: string
+                                timestamp:
+                                  type: string
+                                  format: date-time
+                          quickStats:
+                            type: object
+                            properties:
+                              searchesToday:
+                                type: integer
+                              searchesThisWeek:
+                                type: integer
+                              topQuery:
+                                type: string
+                              errorRate:
+                                type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Admin Analytics Endpoints
+  /api/v1/analytics/admin/system-overview:
+    get:
+      tags: [Analytics]
+      summary: Get system overview (Admin)
+      description: Get system-wide overview data (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: System overview retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalUsers:
+                            type: integer
+                          totalSearches:
+                            type: integer
+                          totalDatabases:
+                            type: integer
+                          systemHealth:
+                            type: object
+                            properties:
+                              status:
+                                type: string
+                              uptime:
+                                type: number
+                              memoryUsage:
+                                type: number
+                              cpuUsage:
+                                type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/analytics/admin/user-activity:
+    get:
+      tags: [Analytics]
+      summary: Get user activity (Admin)
+      description: Get user activity data across the system (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User activity data retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          activeUsers:
+                            type: integer
+                          newUsers:
+                            type: integer
+                          topUsers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                userId:
+                                  type: string
+                                email:
+                                  type: string
+                                searchCount:
+                                  type: integer
+                                lastActive:
+                                  type: string
+                                  format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/analytics/admin/performance-metrics:
+    get:
+      tags: [Analytics]
+      summary: Get system performance metrics (Admin)
+      description: Get detailed system performance metrics (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Performance metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          system:
+                            type: object
+                            properties:
+                              cpuUsage:
+                                type: number
+                              memoryUsage:
+                                type: number
+                              diskUsage:
+                                type: number
+                              uptime:
+                                type: number
+                          api:
+                            type: object
+                            properties:
+                              requestsPerSecond:
+                                type: number
+                              averageResponseTime:
+                                type: number
+                              errorRate:
+                                type: number
+                          database:
+                            type: object
+                            properties:
+                              connectionPoolUsage:
+                                type: number
+                              averageQueryTime:
+                                type: number
+                              slowQueries:
+                                type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'

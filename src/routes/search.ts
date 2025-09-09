@@ -71,7 +71,7 @@ router.post(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
           apiKeyTier: req.apiKey?.rateLimitTier,
         },
       };
@@ -112,7 +112,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
           apiKeyTier: req.apiKey?.rateLimitTier,
         },
       };
@@ -152,7 +152,7 @@ router.post(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
           apiKeyTier: req.apiKey?.rateLimitTier,
         },
       };
@@ -187,7 +187,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
           apiKeyTier: req.apiKey?.rateLimitTier,
         },
       };
@@ -225,7 +225,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
           apiKeyTier: req.apiKey?.rateLimitTier,
         },
       };

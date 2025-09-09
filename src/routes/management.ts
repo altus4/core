@@ -77,14 +77,14 @@ router.get('/health', (req, res) => {
     data: {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || '0.1.0',
+      version: process.env.npm_package_version || '0.3.0',
       uptime: process.uptime(),
       authenticationMethods: ['jwt', 'api-key'],
     },
     meta: {
       timestamp: new Date(),
       requestId: req.get('X-Request-ID') || 'unknown',
-      version: process.env.npm_package_version || '0.1.0',
+      version: process.env.npm_package_version || '0.3.0',
     },
   } as ApiResponse);
 });
@@ -120,7 +120,7 @@ router.get('/migration-status', authenticate, async (req: AuthenticatedRequest, 
       meta: {
         timestamp: new Date(),
         requestId: req.get('X-Request-ID') || 'unknown',
-        version: process.env.npm_package_version || '0.1.0',
+        version: process.env.npm_package_version || '0.3.0',
       },
     } as ApiResponse);
   } catch (_error) {

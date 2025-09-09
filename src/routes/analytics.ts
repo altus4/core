@@ -57,7 +57,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -95,7 +95,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -131,7 +131,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -166,7 +166,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -201,7 +201,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -236,7 +236,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -276,7 +276,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -312,7 +312,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
@@ -348,7 +348,7 @@ router.get(
         meta: {
           timestamp: new Date(),
           requestId: req.get('X-Request-ID') || 'unknown',
-          version: '0.1.0',
+          version: process.env.npm_package_version || '0.3.0',
         },
       };
 
