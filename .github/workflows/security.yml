@@ -21,11 +21,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Prepare npm
         run: |
           npm config set registry https://registry.npmjs.org/
+          npm config set prefer-online true
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 10000
+          npm config set fetch-retry-maxtimeout 60000
           npm cache clean --force
 
       - name: Install dependencies
