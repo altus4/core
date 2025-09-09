@@ -13,6 +13,21 @@ process.env.NODE_ENV = 'test';
 // Configure logger for testing
 logger.level = 'error'; // Only show errors during tests
 
+// Suppress expected auth errors to keep test output clean
+const originalLoggerError = logger.error.bind(logger);
+logger.error = ((message: any, ...meta: any[]) => {
+  const text = typeof message === 'string' ? message : `${message}`;
+  if (
+    text.includes('User registration failed: User with this email already exists') ||
+    text.includes('User login failed: Invalid email or password') ||
+    text.includes('Failed to change password for user')
+  ) {
+    // Swallow expected validation/auth errors during tests
+    return undefined as any;
+  }
+  return (originalLoggerError as any)(message, ...meta);
+}) as any;
+
 // Global test timeout
 jest.setTimeout(60000);
 
@@ -27,6 +42,7 @@ jest.mock('mysql2/promise', () => {
   };
 
   const mockConnection = {
+    config: { database: 'altus4_test' },
     execute: jest.fn().mockImplementation((query: string, params: any[] = []) => {
       // Handle user registration/creation
       if (query.includes('INSERT INTO users')) {
@@ -107,11 +123,125 @@ jest.mock('mysql2/promise', () => {
         return Promise.resolve([{ insertId: id, affectedRows: 1 }, {}]);
       }
 
+      // Handle listing user's API keys
+      if (
+        query.includes('SELECT * FROM api_keys') &&
+        query.includes('WHERE user_id = ?') &&
+        query.includes('is_active = true')
+      ) {
+        const userId = params[0];
+        const rows = Array.from(mockData.apiKeys.values())
+          .filter((k: any) => k.user_id === userId && k.is_active)
+          .map((k: any) => ({
+            ...k,
+          }));
+        return Promise.resolve([rows, {}]);
+      }
+
+      // Handle selecting API key by id and user for update/return
+      if (
+        query.includes('SELECT * FROM api_keys') &&
+        query.includes('WHERE id = ?') &&
+        query.includes('user_id = ?')
+      ) {
+        const [keyId, userId] = params;
+        const key = mockData.apiKeys.get(keyId);
+        if (key && key.user_id === userId) {
+          return Promise.resolve([[{ ...key }], {}]);
+        }
+        return Promise.resolve([[], {}]);
+      }
+
+      // Handle API key usage query
+      if (
+        query.includes('SELECT id, usage_count, last_used, rate_limit_tier FROM api_keys') &&
+        query.includes('WHERE id = ?') &&
+        query.includes('user_id = ?')
+      ) {
+        const [keyId, userId] = params;
+        const key = mockData.apiKeys.get(keyId);
+        if (key && key.user_id === userId) {
+          const row = {
+            id: key.id,
+            usage_count: key.usage_count || 0,
+            last_used: key.last_used || new Date(),
+            rate_limit_tier: key.rate_limit_tier,
+          };
+          return Promise.resolve([[row], {}]);
+        }
+        return Promise.resolve([[], {}]);
+      }
+
+      // Handle API key revoke (deactivate)
+      if (
+        query.includes('UPDATE api_keys SET is_active = false') &&
+        query.includes('WHERE id = ?') &&
+        query.includes('user_id = ?')
+      ) {
+        const [updatedAt, keyId, userId] = params;
+        const key = mockData.apiKeys.get(keyId);
+        if (key && key.user_id === userId) {
+          key.is_active = 0;
+          key.updated_at = updatedAt || new Date();
+          mockData.apiKeys.set(keyId, key);
+          return Promise.resolve([{ affectedRows: 1 }, {}]);
+        }
+        return Promise.resolve([{ affectedRows: 0 }, {}]);
+      }
+
+      // Handle API key property updates (name/permissions/rate_limit_tier/expires_at)
+      if (query.includes('UPDATE api_keys SET') && query.includes('WHERE id = ? AND user_id = ?')) {
+        const keyId = params[params.length - 2];
+        const userId = params[params.length - 1];
+        const key = mockData.apiKeys.get(keyId);
+        if (key && key.user_id === userId) {
+          // Apply updates based on included fields
+          let paramIdx = 0;
+          if (query.includes('name = ?')) {
+            key.name = params[paramIdx++];
+          }
+          if (query.includes('permissions = ?')) {
+            const perms = params[paramIdx++];
+            key.permissions = Array.isArray(perms) ? JSON.stringify(perms) : perms;
+          }
+          if (query.includes('rate_limit_tier = ?')) {
+            key.rate_limit_tier = params[paramIdx++];
+          }
+          if (query.includes('expires_at = ?')) {
+            key.expires_at = params[paramIdx++] || null;
+          }
+          if (query.includes('updated_at = ?')) {
+            key.updated_at = params[paramIdx++] || new Date();
+          }
+          mockData.apiKeys.set(keyId, key);
+          return Promise.resolve([{ affectedRows: 1 }, {}]);
+        }
+        return Promise.resolve([{ affectedRows: 0 }, {}]);
+      }
+
+      // Handle API key last_used update during validation
+      if (
+        query.includes('UPDATE api_keys SET last_used = ?') &&
+        query.includes('usage_count = usage_count + 1') &&
+        query.includes('WHERE id = ?')
+      ) {
+        const [lastUsed, keyId] = params;
+        const key = mockData.apiKeys.get(keyId);
+        if (key) {
+          key.last_used = lastUsed || new Date();
+          key.usage_count = (key.usage_count || 0) + 1;
+          mockData.apiKeys.set(keyId, key);
+          return Promise.resolve([{ affectedRows: 1 }, {}]);
+        }
+        return Promise.resolve([{ affectedRows: 0 }, {}]);
+      }
+
       // Handle API key validation
       if (query.includes('FROM api_keys ak') && query.includes('JOIN users')) {
-        const [keyPrefix, keyHash] = params;
+        const [, keyHash] = params;
+        // Validate by hash only to avoid prefix length coupling in tests
         const apiKey = Array.from(mockData.apiKeys.values()).find(
-          (k: any) => k.key_prefix === keyPrefix && k.key_hash === keyHash && k.is_active
+          (k: any) => k.key_hash === keyHash && k.is_active
         );
         if (!apiKey) {
           return Promise.resolve([[], {}]);
@@ -182,6 +312,303 @@ jest.mock('mysql2/promise', () => {
         return Promise.resolve([{ affectedRows: 0 }, {}]);
       }
 
+      // ===== Database connections handling =====
+      // Insert database connection
+      if (query.includes('INSERT INTO database_connections')) {
+        const [
+          id,
+          userId,
+          name,
+          host,
+          port,
+          databaseName,
+          username,
+          passwordEncrypted,
+          sslEnabled,
+          isActive,
+          createdAt,
+          updatedAt,
+          connectionStatus,
+        ] = params;
+        const row = {
+          id,
+          user_id: userId,
+          name,
+          host,
+          port,
+          database_name: databaseName,
+          username,
+          password: passwordEncrypted,
+          password_encrypted: passwordEncrypted,
+          ssl_enabled: !!sslEnabled,
+          is_active: isActive,
+          created_at: createdAt || new Date(),
+          updated_at: updatedAt || new Date(),
+          connection_status: connectionStatus || 'connected',
+        };
+        mockData.databaseConnections.set(id, row);
+        return Promise.resolve([{ insertId: id, affectedRows: 1 }, {}]);
+      }
+
+      // List database connections for user
+      if (
+        query.includes(
+          'SELECT id, name, host, port, database_name, username, ssl_enabled, is_active, created_at, updated_at FROM database_connections'
+        ) &&
+        query.includes('WHERE user_id = ?')
+      ) {
+        const userId = params[0];
+        const rows = Array.from(mockData.databaseConnections.values())
+          .filter((c: any) => c.user_id === userId && (c.is_active ?? true))
+          .sort((a: any, b: any) => (b.created_at as any) - (a.created_at as any))
+          .map((c: any) => ({ ...c }));
+        return Promise.resolve([rows, {}]);
+      }
+
+      // Get a specific connection by id and user
+      if (
+        query.includes('SELECT * FROM database_connections') &&
+        query.includes('WHERE id = ? AND user_id = ?')
+      ) {
+        const [id, userId] = params;
+        const c = mockData.databaseConnections.get(id);
+        if (c && c.user_id === userId && (c.is_active ?? true)) {
+          return Promise.resolve([[{ ...c }], {}]);
+        }
+        return Promise.resolve([[], {}]);
+      }
+
+      // Hydration query used by DatabaseService.getConnection
+      if (
+        query.includes('SELECT id, name, host, port, database_name, username,') &&
+        query.includes('FROM database_connections') &&
+        query.includes('WHERE id = ?')
+      ) {
+        const [id] = params;
+        const c = mockData.databaseConnections.get(id);
+        if (c && (c.is_active ?? true)) {
+          return Promise.resolve([[{ ...c }], {}]);
+        }
+        return Promise.resolve([[], {}]);
+      }
+
+      // Update database connection fields
+      if (
+        query.includes('UPDATE database_connections SET') &&
+        query.includes('WHERE id = ? AND user_id = ?')
+      ) {
+        const id = params[params.length - 2];
+        const userId = params[params.length - 1];
+        const c = mockData.databaseConnections.get(id);
+        if (!c || c.user_id !== userId) {
+          return Promise.resolve([{ affectedRows: 0 }, {}]);
+        }
+        let idx = 0;
+        if (query.includes('is_active = false')) {
+          c.is_active = 0;
+        }
+        if (query.includes('name = ?')) {
+          c.name = params[idx++];
+        }
+        if (query.includes('host = ?')) {
+          c.host = params[idx++];
+        }
+        if (query.includes('port = ?')) {
+          c.port = params[idx++];
+        }
+        if (query.includes('database_name = ?')) {
+          c.database_name = params[idx++];
+        }
+        if (query.includes('username = ?')) {
+          c.username = params[idx++];
+        }
+        if (query.includes('password_encrypted = ?')) {
+          const p = params[idx++];
+          c.password_encrypted = p;
+          c.password = p;
+        }
+        if (query.includes('ssl_enabled = ?')) {
+          c.ssl_enabled = params[idx++];
+        }
+        if (query.includes('updated_at = ?')) {
+          c.updated_at = params[idx++];
+        }
+        mockData.databaseConnections.set(id, c);
+        return Promise.resolve([{ affectedRows: 1 }, {}]);
+      }
+
+      // Soft delete handled in generic update block above
+
+      // Update last_tested and connection_status
+      if (
+        query.includes('UPDATE database_connections SET last_tested = ?') &&
+        query.includes('connection_status = ?') &&
+        query.includes('WHERE id = ?')
+      ) {
+        const [lastTested, status, id] = params;
+        const c = mockData.databaseConnections.get(id);
+        if (c) {
+          c.last_tested = lastTested || new Date();
+          c.connection_status = status;
+          mockData.databaseConnections.set(id, c);
+          return Promise.resolve([{ affectedRows: 1 }, {}]);
+        }
+        return Promise.resolve([{ affectedRows: 0 }, {}]);
+      }
+
+      // ===== Generic DB execution used by DatabaseService pools =====
+      // SHOW TABLES
+      if (query.toUpperCase().includes('SHOW TABLES')) {
+        return Promise.resolve([[{ Tables_in_db: 'test_content' }], {}]);
+      }
+
+      // DESCRIBE ??
+      if (query.toUpperCase().startsWith('DESCRIBE')) {
+        const columns = [
+          { Field: 'id', Type: 'int' },
+          { Field: 'title', Type: 'varchar(255)' },
+          { Field: 'content', Type: 'text' },
+          { Field: 'created_at', Type: 'datetime' },
+        ];
+        return Promise.resolve([columns as any, {}]);
+      }
+
+      // SHOW INDEX FROM ?? WHERE Index_type = ? (FULLTEXT)
+      if (query.toUpperCase().includes('SHOW INDEX FROM')) {
+        const indexes = [
+          { Key_name: 'title_content_ft', Column_name: 'title', Index_type: 'FULLTEXT' },
+          { Key_name: 'title_content_ft', Column_name: 'content', Index_type: 'FULLTEXT' },
+        ];
+        return Promise.resolve([indexes as any, {}]);
+      }
+
+      // SELECT TABLE_ROWS FROM information_schema.TABLES ...
+      if (query.toUpperCase().includes('SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES')) {
+        return Promise.resolve([[{ TABLE_ROWS: 42 }], {}]);
+      }
+
+      // Combined FULLTEXT search queries using MATCH() AGAINST()
+      if (query.toUpperCase().includes('MATCH(') && query.toUpperCase().includes('AGAINST(')) {
+        const rows = [
+          {
+            table_name: 'test_content',
+            title: 'Test title about databases',
+            content: 'This is a test content snippet related to databases and search.',
+            relevance_score: 0.87,
+          },
+          {
+            table_name: 'test_content',
+            title: 'Another search example',
+            content: 'Sample paragraph with search terms and more.',
+            relevance_score: 0.65,
+          },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
+      // ===== Analytics queries =====
+      // User performance metrics grouped by date
+      if (
+        query.includes('FROM search_analytics') &&
+        query.includes('AVG(execution_time_ms) as avg_response_time') &&
+        query.includes('GROUP BY date')
+      ) {
+        const rows = [
+          { date: '2025-09-01', query_count: 10, avg_response_time: 45, max_response_time: 123 },
+          { date: '2025-09-02', query_count: 5, avg_response_time: 40, max_response_time: 90 },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
+      // Popular queries for a user (group by query_text)
+      if (query.includes('FROM search_analytics') && query.includes('GROUP BY query_text')) {
+        const rows = [
+          {
+            query_text: 'database',
+            frequency: 3,
+            avg_time: 50,
+            avg_results: 12,
+            last_used: new Date(),
+          },
+          {
+            query_text: 'mysql',
+            frequency: 2,
+            avg_time: 40,
+            avg_results: 8,
+            last_used: new Date(),
+          },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
+      // Count total items in search history
+      if (query.includes('SELECT COUNT(*) as total') && query.includes('FROM search_analytics')) {
+        return Promise.resolve([[{ total: 0 }], {}]);
+      }
+
+      // Paged search history rows
+      if (
+        query.includes('SELECT') &&
+        query.includes('FROM search_analytics') &&
+        query.includes('ORDER BY created_at DESC') &&
+        query.includes('LIMIT')
+      ) {
+        const rows: any[] = [];
+        return Promise.resolve([rows, {}]);
+      }
+
+      // Admin: system-wide metrics summary
+      if (
+        query.includes('COUNT(DISTINCT user_id) as active_users') &&
+        query.includes('FROM search_analytics') &&
+        !query.includes('GROUP BY')
+      ) {
+        return Promise.resolve([
+          [{ active_users: 1, total_queries: 15, avg_response_time: 42, avg_results: 9 }],
+          {},
+        ]);
+      }
+
+      // Admin: user growth grouped by date
+      if (query.includes('FROM users') && query.includes('GROUP BY DATE(created_at)')) {
+        const rows = [
+          { date: '2025-09-01', new_users: 1 },
+          { date: '2025-09-02', new_users: 2 },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
+      // Admin: query volume over time
+      if (
+        query.includes('FROM search_analytics') &&
+        query.includes('COUNT(*) as query_count') &&
+        query.includes('GROUP BY DATE(created_at)')
+      ) {
+        const rows = [
+          { date: '2025-09-01', query_count: 10, active_users: 1 },
+          { date: '2025-09-02', query_count: 5, active_users: 1 },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
+      // Admin: slowest queries join users
+      if (
+        query.includes('FROM search_analytics sa') &&
+        query.includes('JOIN users u ON sa.user_id = u.id') &&
+        query.includes('ORDER BY execution_time_ms DESC')
+      ) {
+        const rows = [
+          {
+            query_text: 'heavy query',
+            execution_time_ms: 500,
+            result_count: 1,
+            created_at: new Date(),
+            user_email: 'admin@example.com',
+          },
+        ];
+        return Promise.resolve([rows as any, {}]);
+      }
+
       // Default response for unhandled queries
       return Promise.resolve([[], {}]);
     }),
@@ -223,6 +650,23 @@ jest.mock('ioredis', () => {
   }));
 });
 
+// Mock rate-limiter-flexible to always allow in tests
+jest.mock('rate-limiter-flexible', () => {
+  class RateLimiterRedis {
+    // Mimic constructor signature but ignore args
+    constructor(..._args: any[]) {
+      // Constructor args intentionally unused in mock
+      void _args;
+    }
+    async consume(_key: string) {
+      // Key parameter intentionally unused in mock
+      void _key;
+      return { remainingPoints: 9999, msBeforeNext: 100, totalHits: 0 };
+    }
+  }
+  return { RateLimiterRedis };
+});
+
 // Mock @faker-js/faker to avoid ESM issues
 jest.mock('@faker-js/faker', () => ({
   faker: {
@@ -238,11 +682,23 @@ jest.mock('@faker-js/faker', () => ({
     person: {
       fullName: jest.fn(() => 'Test User'),
     },
+    commerce: {
+      productName: jest.fn(() => 'Test Product'),
+    },
+    word: {
+      words: jest.fn(() => 'alpha beta'),
+    },
     database: {
       engine: jest.fn(() => 'testdb'),
     },
     datatype: {
       boolean: jest.fn(() => true),
+    },
+    helpers: {
+      arrayElement: jest.fn((arr: any[]) => (Array.isArray(arr) && arr.length ? arr[0] : null)),
+    },
+    date: {
+      soon: jest.fn(() => new Date(Date.now() + 1000 * 60 * 60 * 24 * 30)),
     },
     seed: jest.fn(),
   },

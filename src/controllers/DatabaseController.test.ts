@@ -125,11 +125,68 @@ describe('DatabaseController', () => {
       expect(result[0]).not.toHaveProperty('password');
     });
 
-    it('should handle database errors', async () => {
-      const dbError = new Error('Database connection failed');
-      mockConnection.execute.mockRejectedValue(dbError);
+    it('should map fallback fields when alternative columns are present/missing', async () => {
+      const mockRows = [
+        {
+          id: 'conn-456',
+          name: 'Alt Fields Conn',
+          host: '127.0.0.1',
+          port: 3307,
+          // database_name missing; uses fallback to database
+          database: 'alt_db',
+          username: 'alt_user',
+          // ssl_enabled missing; uses fallback to ssl
+          ssl: true,
+          // is_active missing; defaults to true
+          // created_at/updated_at missing; defaults to now
+        } as any,
+      ];
 
-      await expect(databaseController.getUserConnections('user-123')).rejects.toThrow(
+      mockConnection.execute.mockResolvedValue([mockRows]);
+
+      const result = await databaseController.getUserConnections('user-abc');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        id: 'conn-456',
+        name: 'Alt Fields Conn',
+        host: '127.0.0.1',
+        port: 3307,
+        database: 'alt_db',
+        username: 'alt_user',
+        ssl: true,
+        isActive: true,
+      });
+      expect(result[0].createdAt).toBeInstanceOf(Date);
+      expect(result[0].updatedAt).toBeInstanceOf(Date);
+    });
+
+    it('constructor should log error if initial ping fails (no throw)', async () => {
+      // Make first createConnection().ping reject to exercise initializeConnection catch
+      const failingConn = { ping: jest.fn().mockRejectedValue(new Error('ping fail')) } as any;
+      const okConn = { ping: jest.fn().mockResolvedValue(undefined) } as any;
+      (createConnection as jest.Mock)
+        .mockResolvedValueOnce(failingConn) // used by controller.connection
+        .mockResolvedValueOnce(okConn); // fallback for any subsequent direct calls
+
+      const controller = new DatabaseController();
+      // Allow microtask queue to process initializeConnection
+      await new Promise(r => setImmediate(r));
+      expect(controller).toBeInstanceOf(DatabaseController);
+    });
+
+    it('should handle database errors', async () => {
+      // Mock the connection properly
+      const dbError = new Error('Database connection failed');
+      const errorConnection = {
+        execute: jest.fn().mockRejectedValue(dbError),
+        ping: jest.fn(),
+      };
+      (createConnection as jest.Mock).mockResolvedValueOnce(errorConnection);
+
+      const controller = new DatabaseController();
+
+      await expect(controller.getUserConnections('user-123')).rejects.toThrow(
         'Database connection failed'
       );
     });
@@ -166,6 +223,34 @@ describe('DatabaseController', () => {
         // password field should not be present in response
       });
       expect(result).not.toHaveProperty('password');
+    });
+
+    it('should map alternative column names and defaults', async () => {
+      const mockRows = [
+        {
+          id: 'conn-789',
+          name: 'Single Conn',
+          host: 'db.local',
+          port: 3306,
+          // database_name missing; fallback to database
+          database: 'single_db',
+          username: 'user1',
+          // ssl_enabled missing; fallback to ssl
+          ssl: false,
+          // is_active missing; defaults to true
+        } as any,
+      ];
+
+      mockConnection.execute.mockResolvedValue([mockRows]);
+
+      const result = await databaseController.getConnection('user-x', 'conn-789');
+      expect(result).toMatchObject({
+        id: 'conn-789',
+        database: 'single_db',
+        ssl: false,
+        isActive: true,
+      });
+      expect((result as any).password).toBeUndefined();
     });
 
     it('should return null when connection not found', async () => {
@@ -228,6 +313,36 @@ describe('DatabaseController', () => {
       );
       expect(mockConnection.execute).not.toHaveBeenCalled();
     });
+
+    it('should add connection with SSL enabled', async () => {
+      jest.spyOn(databaseController as any, 'testConnectionData').mockResolvedValue(undefined);
+      mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
+      mockDatabaseService.addConnection.mockResolvedValue();
+
+      await databaseController.addConnection('user-ssl', {
+        name: 'SSL Conn',
+        host: 'secure-host',
+        port: 3306,
+        database: 'secure_db',
+        username: 'secure_user',
+        password: 'secure_pass',
+        ssl: true,
+      });
+
+      expect(mockConnection.execute).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO database_connections'),
+        expect.arrayContaining([
+          'user-ssl',
+          'SSL Conn',
+          'secure-host',
+          3306,
+          'secure_db',
+          'secure_user',
+          'encrypted-password',
+          true,
+        ])
+      );
+    });
   });
 
   describe('updateConnection', () => {
@@ -274,6 +389,37 @@ describe('DatabaseController', () => {
         expect.anything()
       );
     });
+
+    it('should update database, username, password and ssl fields', async () => {
+      const current = { ...mockDbConnection } as any;
+      jest
+        .spyOn(databaseController, 'getConnection')
+        .mockResolvedValue(current)
+        .mockResolvedValueOnce(current);
+
+      const encryptSpy = jest
+        .spyOn(EncryptionUtil, 'encrypt')
+        .mockReturnValue('encrypted-updated-password' as any);
+      jest
+        .spyOn<any, any>(databaseController as any, 'testConnectionData')
+        .mockResolvedValue(undefined);
+
+      mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
+
+      const result = await databaseController.updateConnection('user-123', 'conn-123', {
+        database: 'db_new',
+        username: 'user_new',
+        password: 'pass_new',
+        ssl: true,
+      });
+
+      expect(encryptSpy).toHaveBeenCalledWith('pass_new');
+      expect(mockConnection.execute).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE database_connections SET'),
+        expect.arrayContaining(['db_new', 'user_new', 'encrypted-updated-password', true])
+      );
+      expect(result).toBeDefined();
+    });
   });
 
   describe('removeConnection', () => {
@@ -316,6 +462,45 @@ describe('DatabaseController', () => {
         connected: true,
         message: 'Connection successful',
       });
+    });
+
+    it('should test connection only when password updated', async () => {
+      // Mock testConnectionData method to track calls
+      const spy = jest
+        .spyOn<any, any>(databaseController as any, 'testConnectionData')
+        .mockResolvedValue(undefined);
+
+      // Mock getConnection directly to return a consistent connection object
+      const mockConnectionData = {
+        id: 'c1',
+        name: 'Test Connection',
+        host: 'localhost',
+        port: 3306,
+        database: 'test_db',
+        username: 'user',
+        ssl: false,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      jest.spyOn(databaseController, 'getConnection').mockResolvedValue(mockConnectionData);
+
+      // Mock the database update operation
+      mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }, {}]);
+
+      // Test 1: Password update - should call testConnectionData
+      await databaseController.updateConnection('user1', 'c1', { password: 'newpass' } as any);
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      spy.mockClear();
+
+      // Test 2: Host update only - should NOT call testConnectionData
+      await databaseController.updateConnection('user1', 'c1', { host: 'other' } as any);
+      expect(spy).not.toHaveBeenCalled();
+
+      // Restore spies
+      jest.restoreAllMocks();
     });
 
     it('should handle failed connection test', async () => {

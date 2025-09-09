@@ -242,6 +242,63 @@ describe('EncryptionUtil', () => {
     });
   });
 
+  describe('environment key selection', () => {
+    const originalEnv = { ...process.env };
+    afterEach(() => {
+      process.env = { ...originalEnv };
+      jest.resetModules();
+    });
+
+    it('uses random key in non-test when ENCRYPTION_KEY is missing (branch coverage)', async () => {
+      jest.isolateModules(() => {
+        process.env.NODE_ENV = 'production';
+        delete process.env.ENCRYPTION_KEY;
+        const rbSpy = jest
+          .spyOn(require('crypto'), 'randomBytes')
+          .mockReturnValue(Buffer.alloc(32, 7));
+        // Re-require module to re-evaluate key selection logic
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require('@/utils/encryption');
+        expect(mod.EncryptionUtil).toBeDefined();
+        expect(rbSpy).toHaveBeenCalled();
+        rbSpy.mockRestore();
+      });
+    });
+
+    it('uses provided valid ENCRYPTION_KEY (no random key)', async () => {
+      jest.isolateModules(() => {
+        const validKey = 'a'.repeat(64);
+        process.env.NODE_ENV = 'production';
+        process.env.ENCRYPTION_KEY = validKey;
+        const rbSpy = jest.spyOn(require('crypto'), 'randomBytes');
+        const cryptoMod = require('crypto');
+
+        // Create a mock cipher object that behaves like the real one
+        const mockCipher = {
+          update: jest.fn().mockReturnValue('encrypted'),
+          final: jest.fn().mockReturnValue('data'),
+          getAuthTag: jest.fn().mockReturnValue(Buffer.from('authTag')),
+        };
+
+        const ccSpy = jest.spyOn(cryptoMod, 'createCipheriv').mockReturnValue(mockCipher);
+
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { EncryptionUtil: ModUtil } = require('@/utils/encryption');
+        ModUtil.encrypt('hello');
+
+        // Should not generate a random key when env key is valid
+        expect(rbSpy).not.toHaveBeenCalledWith(32);
+        // Assert the key buffer matches our env key
+        const passedKey = ccSpy.mock.calls[0][1] as Buffer;
+        expect(Buffer.isBuffer(passedKey)).toBe(true);
+        expect(passedKey.toString('hex')).toBe(validKey);
+
+        ccSpy.mockRestore();
+        rbSpy.mockRestore();
+      });
+    });
+  });
+
   describe('decrypt', () => {
     beforeEach(() => {
       mockDecipher.setAuthTag.mockReturnValue(undefined);
@@ -540,6 +597,19 @@ describe('EncryptionUtil', () => {
       const result = EncryptionUtil.verifySignature(data, signature);
 
       // Should return false due to length mismatch without calling timingSafeEqual
+      expect(result).toBe(false);
+    });
+
+    it('should return false when signatures have equal length but differ', () => {
+      const data = 'data to verify';
+      // Match expected length from mocked digest('hex')
+      const expected = 'expected-signature';
+      const equalLengthDifferent = 'x'.repeat(expected.length);
+      mockCrypto.timingSafeEqual.mockReturnValue(false);
+
+      const result = EncryptionUtil.verifySignature(data, equalLengthDifferent);
+
+      expect(mockCrypto.timingSafeEqual).toHaveBeenCalled();
       expect(result).toBe(false);
     });
 

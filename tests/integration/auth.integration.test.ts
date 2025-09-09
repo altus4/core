@@ -1,7 +1,7 @@
-import request from 'supertest';
 import { createApp } from '@/app';
-import { TestHelpers } from '@tests/helpers/test-helpers';
 import { seedSuite, userPayload } from '@tests/helpers/factories';
+import { TestHelpers } from '@tests/helpers/test-helpers';
+import request from 'supertest';
 
 describe('Auth Integration (SuperTest)', () => {
   const app = createApp();

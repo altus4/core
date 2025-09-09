@@ -1,8 +1,8 @@
-import { AnalyticsController } from './AnalyticsController';
-import { CacheService } from '@/services/CacheService';
 import { AIService } from '@/services/AIService';
+import { CacheService } from '@/services/CacheService';
 import type { AIInsight } from '@/types';
 import { createConnection } from 'mysql2/promise';
+import { AnalyticsController } from './AnalyticsController';
 
 // Mock dependencies
 jest.mock('@/services/CacheService');
@@ -547,6 +547,127 @@ describe('AnalyticsController', () => {
 
         expect(result).toEqual([]);
       });
+    });
+  });
+
+  describe('Error Handling Coverage', () => {
+    it('should handle database connection initialization error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      // Mock connection to throw error on ping
+      mockConnection.ping.mockRejectedValue(new Error('Connection failed'));
+
+      // Create a new instance to trigger the initialization error
+      (createConnection as jest.Mock).mockResolvedValue(mockConnection);
+
+      // Instantiate a fresh controller so its constructor runs initializeConnection
+      // after we've configured the ping() rejection above.
+      // This ensures the error path logs as expected in this test.
+      new AnalyticsController();
+
+      // Wait a bit for the async initialization to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to establish AnalyticsController database connection:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getPopularQueries error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('Database query failed'));
+
+      await expect(
+        analyticsController.getPopularQueries('user-123', { period: 'week' })
+      ).rejects.toThrow('Database query failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get popular queries for user user-123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getSearchHistory error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute
+        .mockResolvedValueOnce([[{ total: 100 }]]) // Count query succeeds
+        .mockRejectedValueOnce(new Error('History query failed')); // History query fails
+
+      await expect(
+        analyticsController.getSearchHistory('user-123', { period: 'week' })
+      ).rejects.toThrow('History query failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get search history for user user-123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getDashboardData error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      // Reset the cache service to succeed, then make database fail
+      mockCacheService.getTopQueries.mockResolvedValue(['query1', 'query2']);
+      mockCacheService.getQueryVolume.mockResolvedValue(100);
+      mockCacheService.getAverageResponseTime.mockResolvedValue(150);
+      mockCacheService.getPopularCategories.mockResolvedValue(['cat1', 'cat2']);
+
+      // Make the database connection fail
+      mockConnection.execute.mockRejectedValue(new Error('Dashboard query failed'));
+
+      await expect(
+        analyticsController.getDashboardData('user-123', { period: 'week' })
+      ).rejects.toThrow('Dashboard query failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get dashboard data for user user-123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getSystemOverview error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('System overview failed'));
+
+      await expect(analyticsController.getSystemOverview({ period: 'week' })).rejects.toThrow(
+        'System overview failed'
+      );
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get system overview:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getUserActivity error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('User activity failed'));
+
+      await expect(analyticsController.getUserActivity({ limit: 10, offset: 0 })).rejects.toThrow(
+        'User activity failed'
+      );
+
+      expect(logger.error).toHaveBeenCalledWith('Failed to get user activity:', expect.any(Error));
+    });
+
+    it('should handle getSystemPerformanceMetrics error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('Performance metrics failed'));
+
+      await expect(
+        analyticsController.getSystemPerformanceMetrics({ period: 'week' })
+      ).rejects.toThrow('Performance metrics failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get system performance metrics:',
+        expect.any(Error)
+      );
     });
   });
 });

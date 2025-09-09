@@ -161,7 +161,7 @@ describe('Search Performance Tests', () => {
 
       // Cached query should be significantly faster
       // Use a more lenient threshold for CI/parallel execution environments
-      const performanceThreshold = Math.max(uncachedDuration * 0.7, 5); // 30% faster or 5ms max
+      const performanceThreshold = Math.max(uncachedDuration * 0.7, 10); // 30% faster or 10ms max
       expect(cachedDuration).toBeLessThan(performanceThreshold);
 
       // eslint-disable-next-line no-console

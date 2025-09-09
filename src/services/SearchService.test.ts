@@ -17,6 +17,9 @@ describe('SearchService', () => {
     let mockAIService: any;
 
     beforeEach(async () => {
+      // Clear all mocks to avoid interference between tests
+      jest.clearAllMocks();
+
       // Create mock services for dependency injection
       mockDatabaseService = {
         executeFullTextSearch: jest.fn(),
@@ -36,6 +39,11 @@ describe('SearchService', () => {
         getPopularQueries: jest.fn(() => []),
         logSearchAnalytics: jest.fn(),
         close: jest.fn(),
+        // Add missing methods used in SearchService
+        getTopQueries: jest.fn(() => []),
+        getQueryVolume: jest.fn(() => 0),
+        getAverageResponseTime: jest.fn(() => 0),
+        getPopularCategories: jest.fn(() => []),
       };
 
       mockAIService = {
@@ -43,6 +51,7 @@ describe('SearchService', () => {
         processSearchQuery: jest.fn(),
         categorizeResults: jest.fn(() => []),
         getQuerySuggestions: jest.fn(() => []),
+        getOptimizationSuggestions: jest.fn(() => []),
       };
 
       // Initialize SearchService with mocks (databaseService, aiService, cacheService)
@@ -171,6 +180,109 @@ describe('SearchService', () => {
         expect(Array.isArray(results.data.results)).toBe(true);
         // Should contain mock results from test environment graceful degradation
         expect(results.data.results.length).toBeGreaterThan(0);
+      });
+
+      it('returns suggestion notice when databases array is empty', async () => {
+        const result = await searchService.performSearch('hello', { databases: [] });
+        expect(result.success).toBe(true);
+        expect(result.data.queryOptimization?.length).toBeGreaterThanOrEqual(1);
+      });
+
+      it('uses AI semantic optimization when enabled', async () => {
+        // Toggle AI service to available and provide optimized query
+        (mockAIService.isAvailable as jest.Mock).mockReturnValueOnce(true);
+        (mockAIService.processSearchQuery as jest.Mock).mockResolvedValueOnce({
+          optimizedQuery: 'optimized hello',
+          context: {},
+        });
+
+        (mockDatabaseService.executeFullTextSearch as jest.Mock).mockResolvedValueOnce([
+          { table_name: 't', relevance_score: 1, col: 'v' },
+        ]);
+
+        const result = await searchService.performSearch('hello', {
+          databases: ['db1'],
+          searchMode: 'semantic',
+        });
+        expect(result.success).toBe(true);
+        expect((mockAIService.processSearchQuery as jest.Mock).mock.calls[0][0]).toBe('hello');
+      });
+
+      it('throws when all databases fail', async () => {
+        // Create a completely fresh SearchService instance that won't be affected by global mocks
+        // by directly testing the error handling logic
+        const testDbService = {
+          executeFullTextSearch: jest.fn().mockRejectedValue(new Error('DB failure')),
+          getSearchSuggestions: jest.fn(),
+          analyzeQueryPerformance: jest.fn(),
+          testConnection: jest.fn(),
+          close: jest.fn(),
+        } as any;
+
+        class TestableSearchService extends SearchService {
+          // Expose the private search method for testing
+          public async testSearch(request: any) {
+            return this.search(request);
+          }
+        }
+
+        const testCacheService = {
+          get: jest.fn().mockResolvedValue(null), // No cache hits
+          set: jest.fn(),
+          del: jest.fn(),
+          getPopularQueries: jest.fn(() => []),
+          logSearchAnalytics: jest.fn(),
+          close: jest.fn(),
+        };
+
+        const testAIService = {
+          isAvailable: jest.fn(() => false),
+          processSearchQuery: jest.fn(),
+          categorizeResults: jest.fn(() => []),
+          getQuerySuggestions: jest.fn(() => []),
+        };
+
+        const testableService = new TestableSearchService(
+          testDbService,
+          testAIService as any,
+          testCacheService as any
+        );
+
+        // Mock the private executeSearchOnDatabase method
+        jest
+          .spyOn(testableService as any, 'executeSearchOnDatabase')
+          .mockImplementation(async (...args: any[]) => {
+            const databaseId = args[0];
+            throw new Error(`Database ${databaseId} failed`);
+          });
+
+        const searchRequest = {
+          query: 'test query',
+          userId: 'test-user',
+          databases: ['db1', 'db2'],
+          limit: 10,
+          offset: 0,
+          searchMode: 'natural' as const,
+          includeAnalytics: false,
+        };
+
+        // This should now throw because we're overriding the database execution method
+        await expect(testableService.testSearch(searchRequest)).rejects.toThrow(
+          /All 2 databases failed to respond/
+        );
+      });
+
+      it('populates trends when includeAnalytics is true', async () => {
+        (mockDatabaseService.executeFullTextSearch as jest.Mock).mockResolvedValueOnce([
+          { table_name: 't', relevance_score: 1, col: 'v' },
+        ]);
+
+        const result = await searchService.performSearch('abc', {
+          databases: ['db1'],
+          includeAnalytics: true,
+        });
+        expect(result.success).toBe(true);
+        expect(result.data.trends).toBeDefined();
       });
     });
 

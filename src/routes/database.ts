@@ -106,6 +106,37 @@ router.post(
 );
 
 /**
+ * GET /api/v1/databases/status
+ * Get status of all database connections
+ * Place before parameterized routes to avoid shadowing by :connectionId
+ */
+router.get('/status', authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const statuses = await databaseController.getConnectionStatuses(req.user!.id);
+
+    const response: ApiResponse<Record<string, boolean>> = {
+      success: true,
+      data: statuses,
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: '0.1.0',
+      },
+    };
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'STATUS_CHECK_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to check connection statuses',
+      },
+    } as ApiResponse);
+  }
+});
+
+/**
  * GET /api/v1/databases/:connectionId
  * Get a specific database connection
  */
@@ -304,30 +335,6 @@ router.get('/:connectionId/schema', authenticate, async (req: AuthenticatedReque
  * GET /api/v1/databases/status
  * Get status of all database connections
  */
-router.get('/status', authenticate, async (req: AuthenticatedRequest, res) => {
-  try {
-    const statuses = await databaseController.getConnectionStatuses(req.user!.id);
-
-    const response: ApiResponse<Record<string, boolean>> = {
-      success: true,
-      data: statuses,
-      meta: {
-        timestamp: new Date(),
-        requestId: req.get('X-Request-ID') || 'unknown',
-        version: '0.1.0',
-      },
-    };
-
-    res.json(response);
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: {
-        code: 'STATUS_CHECK_FAILED',
-        message: error instanceof Error ? error.message : 'Failed to check connection statuses',
-      },
-    } as ApiResponse);
-  }
-});
+// (status route moved above to avoid conflict with param routes)
 
 export { router as databaseRoutes };

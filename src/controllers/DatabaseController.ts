@@ -191,7 +191,8 @@ export class DatabaseController {
       logger.info(`Database connection added: ${connectionData.name} for user ${userId}`);
 
       // Return connection without password
-      const { ...connectionWithoutPassword } = dbConnection as any;
+      const connectionWithoutPassword = { ...dbConnection };
+      delete (connectionWithoutPassword as any).password;
       return connectionWithoutPassword;
     } catch (error) {
       logger.error(`Failed to add connection for user ${userId}:`, error);

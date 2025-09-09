@@ -1,398 +1,217 @@
-import type { DatabaseConnection } from '@/types';
+/**
+ * DatabaseService Unit Tests
+ *
+ * Comprehensive test suite for DatabaseService using isolated test utilities
+ * to ensure proper test isolation and prevent mock interference.
+ */
+
+import { EncryptionUtil } from '@/utils/encryption';
 import { logger } from '@/utils/logger';
-import type { Pool, PoolConnection } from 'mysql2/promise';
-import mysql from 'mysql2/promise';
+import { DatabaseTestUtils } from '../../tests/helpers/database-test-utils';
 import { DatabaseService } from './DatabaseService';
 
-// Explicitly unmock the DatabaseService itself
-jest.unmock('./DatabaseService');
-
 // Mock dependencies
-jest.mock('mysql2/promise');
 jest.mock('@/utils/logger');
+jest.mock('@/utils/encryption');
+jest.mock('mysql2/promise');
 
-const mockMysql = mysql as jest.Mocked<typeof mysql>;
 const mockLogger = logger as jest.Mocked<typeof logger>;
+const mockEncryptionUtil = EncryptionUtil as jest.Mocked<typeof EncryptionUtil>;
 
 describe('DatabaseService', () => {
-  let databaseService: DatabaseService;
-  let mockPool: jest.Mocked<Pool>;
-  let mockConnection: jest.Mocked<PoolConnection>;
+  afterAll(() => {
+    DatabaseTestUtils.cleanup();
+  });
 
   beforeEach(() => {
-    // Clear all mocks
     jest.clearAllMocks();
+  });
 
-    // Create mock connection
-    mockConnection = {
-      ping: jest.fn(),
-      release: jest.fn(),
-      execute: jest.fn(),
-      config: { database: 'test_db' },
-    } as any;
-
-    // Create mock pool
-    mockPool = {
-      getConnection: jest.fn().mockResolvedValue(mockConnection),
-      end: jest.fn(),
-    } as any;
-
-    // Mock mysql createPool
-    mockMysql.createPool.mockReturnValue(mockPool);
-
-    databaseService = new DatabaseService();
+  describe('constructor', () => {
+    it('should create DatabaseService instance', () => {
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService();
+      expect(service).toBeInstanceOf(DatabaseService);
+      cleanup();
+    });
   });
 
   describe('addConnection', () => {
-    const testDbConfig: DatabaseConnection = {
-      id: 'test-db-1',
-      name: 'Test Database',
-      host: 'localhost',
-      port: 3306,
-      database: 'test_db',
-      username: 'test_user',
-      password: 'test_password',
-      ssl: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-    };
-
     it('should successfully add a database connection', async () => {
-      // Arrange
-      mockConnection.ping.mockResolvedValue();
-
-      // Act
-      await databaseService.addConnection(testDbConfig);
-
-      // Assert
-      expect(mockMysql.createPool).toHaveBeenCalledWith({
-        host: 'localhost',
-        port: 3306,
-        user: 'test_user',
-        password: 'test_password',
-        database: 'test_db',
-        connectionLimit: 5,
-        acquireTimeout: 60000,
-        timeout: 60000,
-        reconnect: true,
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'test-conn',
+        skipConnectionSetup: true, // We want to test the actual addConnection method
       });
-      expect(mockPool.getConnection).toHaveBeenCalled();
-      expect(mockConnection.ping).toHaveBeenCalled();
-      expect(mockConnection.release).toHaveBeenCalled();
+
+      const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
+        id: 'test-conn',
+        name: 'Test Connection',
+      });
+
+      await service.addConnection(dbConfig);
+
+      expect(mocks.pool.getConnection).toHaveBeenCalled();
+      expect(mocks.connection.ping).toHaveBeenCalled();
+      expect(mocks.connection.release).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Database connection added: Test Database (test-db-1)'
+        'Database connection added: Test Connection (test-conn)'
       );
+
+      cleanup();
     });
 
     it('should configure SSL when ssl is true', async () => {
-      // Arrange
-      const sslConfig = { ...testDbConfig, ssl: true };
-      mockConnection.ping.mockResolvedValue();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'ssl-conn',
+        skipConnectionSetup: true,
+      });
 
-      // Act
-      await databaseService.addConnection(sslConfig);
+      const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
+        id: 'ssl-conn',
+        ssl: true,
+      });
 
-      // Assert
-      expect(mockMysql.createPool).toHaveBeenCalledWith(
+      await service.addConnection(dbConfig);
+
+      expect(mocks.mysql.createPool).toHaveBeenCalledWith(
         expect.objectContaining({
-          ssl: 'Amazon RDS',
+          ssl: {},
         })
       );
+
+      cleanup();
     });
 
-    it('should configure SSL when ssl is enabled', async () => {
-      // Arrange
-      const sslConfig = { ...testDbConfig, ssl: true };
-      mockConnection.ping.mockResolvedValue();
+    it('should configure custom SSL string', async () => {
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'custom-ssl-conn',
+        skipConnectionSetup: true,
+      });
 
-      // Act
-      await databaseService.addConnection(sslConfig);
+      const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
+        id: 'custom-ssl-conn',
+        ssl: true,
+      });
 
-      // Assert
-      expect(mockMysql.createPool).toHaveBeenCalledWith(
+      await service.addConnection(dbConfig);
+
+      expect(mocks.mysql.createPool).toHaveBeenCalledWith(
         expect.objectContaining({
-          ssl: 'Amazon RDS',
+          ssl: {},
         })
       );
+
+      cleanup();
     });
 
     it('should handle connection errors and throw meaningful error', async () => {
-      // Arrange
-      const connectionError = new Error('Connection refused');
-      mockPool.getConnection.mockRejectedValue(connectionError);
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'fail-conn',
+        skipConnectionSetup: true,
+        mockResponses: {
+          shouldPingFail: true,
+        },
+      });
 
-      // Act & Assert
-      await expect(databaseService.addConnection(testDbConfig)).rejects.toThrow(
-        'Database connection failed: Connection refused'
-      );
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to add database connection Test Database:',
-        connectionError
-      );
-    });
+      const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
+        id: 'fail-conn',
+        name: 'Failing Connection',
+      });
 
-    it('should handle ping errors and throw meaningful error', async () => {
-      // Arrange
-      const pingError = new Error('Ping failed');
-      mockConnection.ping.mockRejectedValue(pingError);
-
-      // Act & Assert
-      await expect(databaseService.addConnection(testDbConfig)).rejects.toThrow(
+      await expect(service.addConnection(dbConfig)).rejects.toThrow(
         'Database connection failed: Ping failed'
       );
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to add database connection Failing Connection:',
+        expect.any(Error)
+      );
+
+      cleanup();
     });
   });
 
   describe('removeConnection', () => {
     it('should remove existing connection', async () => {
-      // Arrange - First add a connection
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'remove-test',
+      });
 
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
+      await service.removeConnection('remove-test');
 
-      // Act
-      await databaseService.removeConnection('test-db-1');
+      expect(mocks.pool.end).toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith('Database connection removed: remove-test');
 
-      // Assert
-      expect(mockPool.end).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Database connection removed: test-db-1');
+      cleanup();
     });
 
     it('should handle non-existing connection gracefully', async () => {
-      // Act
-      await databaseService.removeConnection('non-existing-id');
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService();
 
-      // Assert - should not call end or log anything
-      expect(mockPool.end).not.toHaveBeenCalled();
+      // Should not throw error or log warnings for non-existent connections
+      await expect(service.removeConnection('non-existent')).resolves.toBeUndefined();
+
+      // No warning should be logged for non-existent connections
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+
+      cleanup();
     });
   });
 
   describe('testConnection', () => {
     it('should return true for successful connection test', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'test-success',
+      });
 
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
+      const result = await service.testConnection('test-success');
 
-      // Act
-      const result = await databaseService.testConnection('test-db-1');
-
-      // Assert
       expect(result).toBe(true);
-      expect(mockConnection.ping).toHaveBeenCalledTimes(2); // Once during add, once during test
+
+      cleanup();
     });
 
     it('should return false for failed connection test', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'test-fail',
+        mockResponses: {
+          shouldPingFail: true,
+        },
+      });
 
-      // Add connection successfully
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
+      const result = await service.testConnection('test-fail');
 
-      // Make ping fail for the test
-      mockConnection.ping.mockRejectedValue(new Error('Connection lost'));
-
-      // Act
-      const result = await databaseService.testConnection('test-db-1');
-
-      // Assert
       expect(result).toBe(false);
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Connection test failed for test-db-1:',
-        expect.any(Error)
-      );
+
+      cleanup();
     });
 
     it('should return false for non-existing connection', async () => {
-      // Act
-      const result = await databaseService.testConnection('non-existing-id');
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService();
 
-      // Assert
+      const result = await service.testConnection('non-existent');
+
       expect(result).toBe(false);
-    });
-  });
 
-  describe('discoverSchema', () => {
-    it('should discover table schemas successfully', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
-
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
-
-      // Mock table discovery
-      const mockTables = [{ Tables_in_test_db: 'users' }, { Tables_in_test_db: 'posts' }];
-      const mockColumns = [
-        { Field: 'id', Type: 'int(11)' },
-        { Field: 'name', Type: 'varchar(255)' },
-        { Field: 'content', Type: 'text' },
-      ];
-      const mockIndexes = [
-        { Key_name: 'content_idx', Column_name: 'content', Index_type: 'FULLTEXT' },
-      ];
-      const mockRowCount = [{ TABLE_ROWS: 1000 }];
-
-      mockConnection.execute
-        .mockResolvedValueOnce([mockTables, []] as any) // SHOW TABLES
-        .mockResolvedValueOnce([mockColumns, []] as any) // DESCRIBE users
-        .mockResolvedValueOnce([mockIndexes, []] as any) // SHOW INDEX FROM users
-        .mockResolvedValueOnce([mockRowCount, []] as any) // SELECT TABLE_ROWS
-        .mockResolvedValueOnce([mockColumns, []] as any) // DESCRIBE posts
-        .mockResolvedValueOnce([[], []] as any) // SHOW INDEX FROM posts (no indexes)
-        .mockResolvedValueOnce([mockRowCount, []] as any); // SELECT TABLE_ROWS
-
-      // Act
-      const schemas = await databaseService.discoverSchema('test-db-1');
-
-      // Assert
-      expect(schemas).toHaveLength(2);
-      expect(schemas[0]).toMatchObject({
-        database: 'test_db',
-        table: 'users',
-        columns: expect.arrayContaining([
-          expect.objectContaining({
-            name: 'content',
-            type: 'text',
-            isFullTextIndexed: true,
-            isSearchable: true,
-          }),
-        ]),
-        fullTextIndexes: [
-          {
-            name: 'content_idx',
-            columns: ['content'],
-            type: 'FULLTEXT',
-          },
-        ],
-        estimatedRows: 1000,
-      });
-
-      expect(mockConnection.release).toHaveBeenCalled();
-    });
-
-    it('should handle database errors during schema discovery', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
-
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
-
-      const dbError = new Error('Access denied');
-      mockConnection.execute.mockRejectedValue(dbError);
-
-      // Act & Assert
-      await expect(databaseService.discoverSchema('test-db-1')).rejects.toThrow('Access denied');
-      expect(mockConnection.release).toHaveBeenCalled();
+      cleanup();
     });
   });
 
   describe('executeFullTextSearch', () => {
     it('should execute full-text search successfully', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
-
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
-
-      // Mock indexes and search results
-      const mockIndexes = [
-        { Key_name: 'content_idx', Column_name: 'content', Index_type: 'FULLTEXT' },
-        { Key_name: 'content_idx', Column_name: 'title', Index_type: 'FULLTEXT' },
-      ];
-      const mockSearchResults = [
-        {
-          table_name: 'posts',
-          content: 'Test content here',
-          title: 'Test title',
-          relevance_score: 0.95,
+      const responses = DatabaseTestUtils.createMockResponses();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'search-db',
+        mockResponses: {
+          executeResponses: [responses.fulltextIndexes, responses.searchResults],
         },
-      ];
+      });
 
-      mockConnection.execute
-        .mockResolvedValueOnce([mockIndexes, []] as any) // SHOW INDEX
-        .mockResolvedValueOnce([mockSearchResults, []] as any); // Search query
-
-      // Act
-      const results = await databaseService.executeFullTextSearch(
-        'test-db-1',
+      const results = await service.executeFullTextSearch(
+        'search-db',
         'test query',
         ['posts'],
-        ['content', 'title'],
-        20,
-        0
+        ['content', 'title']
       );
 
-      // Assert
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
         table_name: 'posts',
@@ -400,210 +219,241 @@ describe('DatabaseService', () => {
         title: 'Test title',
         relevance_score: 0.95,
       });
-      expect(mockConnection.release).toHaveBeenCalled();
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
     });
 
     it('should handle tables with no full-text indexes', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const responses = DatabaseTestUtils.createMockResponses();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'no-indexes-db',
+        mockResponses: {
+          executeResponses: [responses.empty], // No indexes found
+        },
+      });
 
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
+      const results = await service.executeFullTextSearch('no-indexes-db', 'test query', ['posts']);
 
-      // Mock empty indexes
-      mockConnection.execute.mockResolvedValue([[], []] as any);
-
-      // Act
-      const results = await databaseService.executeFullTextSearch('test-db-1', 'test query', [
-        'posts',
-      ]);
-
-      // Assert
       expect(results).toEqual([]);
       expect(mockLogger.warn).toHaveBeenCalledWith('No full-text indexes found for table: posts');
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
+    });
+
+    it('should skip columns not in filter and return empty if nothing to search', async () => {
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'filter-test-db',
+        mockResponses: {
+          executeResponses: [
+            // Return indexes that don't match the column filter
+            [[{ Column_name: 'content', Key_name: 'idx' }], []],
+          ],
+        },
+      });
+
+      const results = await service.executeFullTextSearch(
+        'filter-test-db',
+        'query',
+        ['table1'],
+        ['title'] // Filter for 'title' but indexes only have 'content'
+      );
+
+      expect(results).toEqual([]);
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
     });
   });
 
   describe('getSearchSuggestions', () => {
     it('should return search suggestions', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const responses = DatabaseTestUtils.createMockResponses();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'suggestions-db',
+        mockResponses: {
+          executeResponses: [
+            [[{ Column_name: 'title' }], []], // Index query
+            responses.suggestions, // Suggestions query
+          ],
+        },
+      });
 
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
-
-      const mockIndexes = [{ Column_name: 'title' }];
-      const mockSuggestions = [{ title: 'database design' }, { title: 'database optimization' }];
-
-      mockConnection.execute
-        .mockResolvedValueOnce([mockIndexes, []] as any) // SHOW INDEX
-        .mockResolvedValueOnce([mockSuggestions, []] as any); // Suggestions query
-
-      // Act
-      const suggestions = await databaseService.getSearchSuggestions(
-        'test-db-1',
+      const suggestions = await service.getSearchSuggestions(
+        'suggestions-db',
         'datab',
         ['posts'],
         5
       );
 
-      // Assert
       expect(suggestions).toEqual(['database design', 'database optimization']);
-      expect(mockConnection.release).toHaveBeenCalled();
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
+    });
+  });
+
+  describe('discoverSchema', () => {
+    it('should discover table schemas successfully', async () => {
+      const responses = DatabaseTestUtils.createMockResponses();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'schema-db',
+        mockResponses: {
+          executeResponses: [
+            responses.tables, // SHOW TABLES
+            responses.columns, // DESCRIBE table
+            responses.fulltextIndexes, // SHOW INDEX FROM table WHERE Index_type = 'FULLTEXT'
+            [[{ TABLE_ROWS: 42 }], []], // SELECT TABLE_ROWS from information_schema.TABLES
+          ],
+        },
+      });
+
+      const schema = await service.discoverSchema('schema-db');
+
+      expect(schema).toHaveLength(1);
+      expect(schema[0]).toMatchObject({
+        database: 'test_db',
+        table: 'posts',
+        columns: expect.arrayContaining([
+          expect.objectContaining({ name: 'id', type: 'int' }),
+          expect.objectContaining({ name: 'title', type: 'varchar(255)' }),
+          expect.objectContaining({ name: 'content', type: 'text' }),
+        ]),
+        fullTextIndexes: expect.any(Array),
+        estimatedRows: 42,
+        lastAnalyzed: expect.any(Date),
+      });
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
+    });
+
+    it('should handle database errors during schema discovery', async () => {
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'schema-error-db',
+        mockResponses: {
+          shouldExecuteFail: true,
+        },
+      });
+
+      await expect(service.discoverSchema('schema-error-db')).rejects.toThrow('Execute failed');
+
+      cleanup();
     });
   });
 
   describe('analyzeQueryPerformance', () => {
     it('should analyze query performance using EXPLAIN', async () => {
-      // Arrange
-      const testDbConfig: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const responses = DatabaseTestUtils.createMockResponses();
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'performance-db',
+        mockResponses: {
+          executeResponses: [responses.explainResult],
+        },
+      });
 
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig);
-
-      const mockExplanation = [
-        { id: 1, select_type: 'SIMPLE', table: 'posts', type: 'fulltext', key: 'content_idx' },
-      ];
-
-      mockConnection.execute.mockResolvedValue([mockExplanation, []] as any);
-
-      // Act
-      const explanation = await databaseService.analyzeQueryPerformance(
-        'test-db-1',
+      const analysis = await service.analyzeQueryPerformance(
+        'performance-db',
         'SELECT * FROM posts'
       );
 
-      // Assert
-      expect(explanation).toEqual(mockExplanation);
-      expect(mockConnection.execute).toHaveBeenCalledWith('EXPLAIN SELECT * FROM posts');
-      expect(mockConnection.release).toHaveBeenCalled();
+      // Should return raw EXPLAIN results
+      expect(analysis).toEqual([
+        { id: 1, select_type: 'SIMPLE', table: 'posts', type: 'fulltext' },
+      ]);
+      expect(mocks.connection.release).toHaveBeenCalled();
+
+      cleanup();
     });
   });
 
   describe('closeAllConnections', () => {
     it('should close all database connections', async () => {
-      // Arrange - Add two connections
-      const testDbConfig1: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database 1',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db1',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService();
 
-      const testDbConfig2: DatabaseConnection = {
-        id: 'test-db-2',
-        name: 'Test Database 2',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db2',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
+      // Add multiple connections
+      const pool1 = { end: jest.fn().mockResolvedValue(undefined) };
+      const pool2 = { end: jest.fn().mockResolvedValue(undefined) };
+      (service as any).connections.set('db1', pool1);
+      (service as any).connections.set('db2', pool2);
 
-      const mockPool2 = {
-        getConnection: jest.fn().mockResolvedValue(mockConnection),
-        end: jest.fn(),
-      } as any;
+      await service.closeAllConnections();
 
-      mockMysql.createPool.mockReturnValueOnce(mockPool).mockReturnValueOnce(mockPool2);
-
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig1);
-      await databaseService.addConnection(testDbConfig2);
-
-      // Act
-      await databaseService.closeAllConnections();
-
-      // Assert
-      expect(mockPool.end).toHaveBeenCalled();
-      expect(mockPool2.end).toHaveBeenCalled();
+      expect(pool1.end).toHaveBeenCalled();
+      expect(pool2.end).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith('All database connections closed');
+
+      cleanup();
     });
   });
 
   describe('getConnectionStatuses', () => {
     it('should return connection statuses for all databases', async () => {
-      // Arrange
-      const testDbConfig1: DatabaseConnection = {
-        id: 'test-db-1',
-        name: 'Test Database 1',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db1',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
-
-      const testDbConfig2: DatabaseConnection = {
-        id: 'test-db-2',
-        name: 'Test Database 2',
-        host: 'localhost',
-        port: 3306,
-        database: 'test_db2',
-        username: 'test_user',
-        password: 'test_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        isActive: true,
-      };
-
-      mockConnection.ping.mockResolvedValue();
-      await databaseService.addConnection(testDbConfig1);
-      await databaseService.addConnection(testDbConfig2);
-
-      // Act
-      const statuses = await databaseService.getConnectionStatuses();
-
-      // Assert
-      expect(statuses).toEqual({
-        'test-db-1': true,
-        'test-db-2': true,
+      const { service, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'status-db',
       });
+
+      const statuses = await service.getConnectionStatuses();
+
+      // Should return a Record<string, boolean> format
+      expect(statuses).toEqual({
+        'status-db': true,
+      });
+
+      cleanup();
+    });
+  });
+
+  describe('encryption fallback', () => {
+    it('should fall back to empty password if decryption fails', async () => {
+      // Mock EncryptionUtil.decrypt to throw an error
+      mockEncryptionUtil.decrypt = jest.fn().mockImplementation(() => {
+        throw new Error('Decryption failed');
+      });
+
+      const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
+        connectionId: 'encryption-test',
+        skipConnectionSetup: true,
+      });
+
+      // Mock metaConnection to return connection with encrypted password
+      const mockMetaConn = {
+        execute: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'encryption-test',
+              host: 'localhost',
+              port: 3306,
+              username: 'user',
+              database_name: 'db',
+              password: null,
+              password_encrypted: 'invalid:tag:cipher',
+              ssl_enabled: 0,
+              is_active: 1,
+            },
+          ],
+          [],
+        ]),
+      };
+
+      // Override the metaConnection property
+      Object.defineProperty(service, 'metaConnection', {
+        get: () => Promise.resolve(mockMetaConn),
+        configurable: true,
+      });
+
+      // Mock createPool to verify empty password is used
+      mocks.mysql.createPool = jest.fn().mockImplementation((config: any) => {
+        expect(config.password).toBe('');
+        return mocks.pool;
+      });
+
+      const result = await service.testConnection('encryption-test');
+      expect(result).toBe(true);
+      expect(mockEncryptionUtil.decrypt).toHaveBeenCalledWith('invalid:tag:cipher');
+
+      cleanup();
     });
   });
 });

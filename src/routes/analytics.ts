@@ -33,8 +33,9 @@ const timeRangeSchema = z.object({
 
 const searchAnalyticsQuerySchema = z.object({
   ...timeRangeSchema.shape,
-  limit: z.number().min(1).max(1000).default(100),
-  offset: z.number().min(0).default(0),
+  // Coerce query string numbers to numeric types for GET endpoints
+  limit: z.coerce.number().min(1).max(1000).default(100),
+  offset: z.coerce.number().min(0).default(0),
 });
 
 /**

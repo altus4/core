@@ -10,13 +10,12 @@
  *   - Remove a connection with removeConnection()
  *   - Interact with databases using other service methods
  */
+import { config } from '@/config';
 import type { ColumnInfo, DatabaseConnection, FullTextIndex, TableSchema } from '@/types';
+import { EncryptionUtil } from '@/utils/encryption';
 import { logger } from '@/utils/logger';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
-import mysql from 'mysql2/promise';
-import { createConnection } from 'mysql2/promise';
-import { config } from '@/config';
-import { EncryptionUtil } from '@/utils/encryption';
+import mysql, { createConnection } from 'mysql2/promise';
 
 export class DatabaseService {
   /**
@@ -73,9 +72,9 @@ export class DatabaseService {
 
       // Add SSL configuration if specified
       if (dbConfig.ssl === true) {
-        poolConfig.ssl = 'Amazon RDS'; // Use default Amazon RDS SSL
+        poolConfig.ssl = {}; // Use empty object for MySQL SSL configuration
       } else if (typeof dbConfig.ssl === 'string') {
-        poolConfig.ssl = dbConfig.ssl; // Use custom SSL string
+        poolConfig.ssl = {}; // Convert custom SSL string to empty object for MySQL
       }
 
       // Create a new connection pool
