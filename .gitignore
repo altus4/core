@@ -5,6 +5,7 @@ jspm_packages/
 # Build outputs
 dist/
 build/
+docs/
 *.tsbuildinfo
 *.js.map
 *.js.map.js
