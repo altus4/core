@@ -47,8 +47,13 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
+      - name: Prepare npm
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Wait for MySQL
         run: |
@@ -138,8 +143,13 @@ jobs:
           node-version: 20.x
           cache: 'npm'
 
+      - name: Prepare npm
+        run: |
+          npm config set registry https://registry.npmjs.org/
+          npm cache clean --force
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Run security audit
         run: npm audit --audit-level=high
