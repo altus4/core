@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- No changes yet.
+
+---
+
+## [0.3.0] - 2025-09-09
+
 ### Added
 
 #### **External API Timeout Management**
