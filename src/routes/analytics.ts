@@ -10,6 +10,7 @@
 import { AnalyticsController } from '@/controllers/AnalyticsController';
 import type { ApiKeyAuthenticatedRequest } from '@/middleware/apiKeyAuth';
 import { authenticateApiKey, requirePermission } from '@/middleware/apiKeyAuth';
+import { authenticate } from '@/middleware/auth';
 import { validateRequest } from '@/middleware/validation';
 import type { ApiResponse } from '@/types';
 import { Router } from 'express';
@@ -229,8 +230,7 @@ router.get(
  */
 router.get(
   '/dashboard',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
   async (req: ApiKeyAuthenticatedRequest, res) => {
     try {

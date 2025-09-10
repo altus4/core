@@ -32,9 +32,11 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
 
   describe('User analytics', () => {
     let apiKey: string;
+    let jwt: string;
     beforeAll(async () => {
-      const { secretKey } = await createUserAndApiKey('user');
+      const { secretKey, jwtToken } = await createUserAndApiKey('user');
       apiKey = secretKey;
+      jwt = jwtToken;
     });
 
     it('returns search trends', async () => {
@@ -92,7 +94,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns dashboard data', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/dashboard')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
