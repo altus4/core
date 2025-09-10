@@ -8,8 +8,8 @@
  *   - Mount this router at /api/v1/databases in the main server
  */
 import { DatabaseController } from '@/controllers/DatabaseController';
-import type { ApiKeyAuthenticatedRequest } from '@/middleware/apiKeyAuth';
-import { authenticateApiKey, requirePermission } from '@/middleware/apiKeyAuth';
+import type { AuthenticatedRequest } from '@/middleware/auth';
+import { authenticate } from '@/middleware/auth';
 import { validateRequest } from '@/middleware/validation';
 import type { ApiResponse, DatabaseConnectionResponse, TableSchema } from '@/types';
 import { Router } from 'express';
@@ -42,11 +42,11 @@ const updateConnectionSchema = z.object({
 /**
  * GET /api/v1/databases
  * Get all user's database connections
- * Requires API key authentication (admin permission) and delegates to DatabaseController.getUserConnections()
+ * Requires JWT authentication and delegates to DatabaseController.getUserConnections()
  */
-router.use(authenticateApiKey);
+router.use(authenticate);
 
-router.get('/', requirePermission('admin'), async (req: ApiKeyAuthenticatedRequest, res) => {
+router.get('/', async (req: AuthenticatedRequest, res) => {
   try {
     const connections = await databaseController.getUserConnections(req.user!.id);
 
@@ -78,9 +78,8 @@ router.get('/', requirePermission('admin'), async (req: ApiKeyAuthenticatedReque
  */
 router.post(
   '/',
-  requirePermission('admin'),
   validateRequest({ body: addConnectionSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const connection = await databaseController.addConnection(req.user!.id, req.body);
 
@@ -112,7 +111,7 @@ router.post(
  * Get status of all database connections
  * Place before parameterized routes to avoid shadowing by :connectionId
  */
-router.get('/status', requirePermission('admin'), async (req: ApiKeyAuthenticatedRequest, res) => {
+router.get('/status', async (req: AuthenticatedRequest, res) => {
   try {
     const statuses = await databaseController.getConnectionStatuses(req.user!.id);
 
@@ -142,48 +141,44 @@ router.get('/status', requirePermission('admin'), async (req: ApiKeyAuthenticate
  * GET /api/v1/databases/:connectionId
  * Get a specific database connection
  */
-router.get(
-  '/:connectionId',
-  requirePermission('admin'),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
-    try {
-      const connection = await databaseController.getConnection(
-        req.user!.id,
-        req.params.connectionId
-      );
+router.get('/:connectionId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const connection = await databaseController.getConnection(
+      req.user!.id,
+      req.params.connectionId
+    );
 
-      if (!connection) {
-        return res.status(404).json({
-          success: false,
-          error: {
-            code: 'CONNECTION_NOT_FOUND',
-            message: 'Database connection not found',
-          },
-        } as ApiResponse);
-      }
-
-      const response: ApiResponse<DatabaseConnectionResponse> = {
-        success: true,
-        data: connection,
-        meta: {
-          timestamp: new Date(),
-          requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.3.0',
-        },
-      };
-
-      return res.json(response);
-    } catch (error) {
-      return res.status(500).json({
+    if (!connection) {
+      return res.status(404).json({
         success: false,
         error: {
-          code: 'CONNECTION_RETRIEVAL_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to retrieve connection',
+          code: 'CONNECTION_NOT_FOUND',
+          message: 'Database connection not found',
         },
       } as ApiResponse);
     }
+
+    const response: ApiResponse<DatabaseConnectionResponse> = {
+      success: true,
+      data: connection,
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: process.env.npm_package_version || '0.3.0',
+      },
+    };
+
+    return res.json(response);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'CONNECTION_RETRIEVAL_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to retrieve connection',
+      },
+    } as ApiResponse);
   }
-);
+});
 
 /**
  * PUT /api/v1/databases/:connectionId
@@ -191,9 +186,8 @@ router.get(
  */
 router.put(
   '/:connectionId',
-  requirePermission('admin'),
   validateRequest({ body: updateConnectionSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const connection = await databaseController.updateConnection(
         req.user!.id,
@@ -238,119 +232,104 @@ router.put(
  * DELETE /api/v1/databases/:connectionId
  * Remove a database connection
  */
-router.delete(
-  '/:connectionId',
-  requirePermission('admin'),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
-    try {
-      const success = await databaseController.removeConnection(
-        req.user!.id,
-        req.params.connectionId
-      );
+router.delete('/:connectionId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const success = await databaseController.removeConnection(
+      req.user!.id,
+      req.params.connectionId
+    );
 
-      if (!success) {
-        return res.status(404).json({
-          success: false,
-          error: {
-            code: 'CONNECTION_NOT_FOUND',
-            message: 'Database connection not found',
-          },
-        } as ApiResponse);
-      }
-
-      const response: ApiResponse<{ success: boolean }> = {
-        success: true,
-        data: { success: true },
-        meta: {
-          timestamp: new Date(),
-          requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.3.0',
-        },
-      };
-
-      return res.json(response);
-    } catch (error) {
-      return res.status(500).json({
+    if (!success) {
+      return res.status(404).json({
         success: false,
         error: {
-          code: 'CONNECTION_REMOVAL_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to remove connection',
+          code: 'CONNECTION_NOT_FOUND',
+          message: 'Database connection not found',
         },
       } as ApiResponse);
     }
+
+    const response: ApiResponse<{ success: boolean }> = {
+      success: true,
+      data: { success: true },
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: process.env.npm_package_version || '0.3.0',
+      },
+    };
+
+    return res.json(response);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'CONNECTION_REMOVAL_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to remove connection',
+      },
+    } as ApiResponse);
   }
-);
+});
 
 /**
  * POST /api/v1/databases/:connectionId/test
  * Test database connection
  */
-router.post(
-  '/:connectionId/test',
-  requirePermission('admin'),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
-    try {
-      const result = await databaseController.testConnection(req.user!.id, req.params.connectionId);
+router.post('/:connectionId/test', async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await databaseController.testConnection(req.user!.id, req.params.connectionId);
 
-      const response: ApiResponse<{ connected: boolean; message?: string }> = {
-        success: true,
-        data: result,
-        meta: {
-          timestamp: new Date(),
-          requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.3.0',
-        },
-      };
+    const response: ApiResponse<{ connected: boolean; message?: string }> = {
+      success: true,
+      data: result,
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: process.env.npm_package_version || '0.3.0',
+      },
+    };
 
-      res.json(response);
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'CONNECTION_TEST_FAILED',
-          message: error instanceof Error ? error.message : 'Connection test failed',
-        },
-      } as ApiResponse);
-    }
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'CONNECTION_TEST_FAILED',
+        message: error instanceof Error ? error.message : 'Connection test failed',
+      },
+    } as ApiResponse);
   }
-);
+});
 
 /**
  * GET /api/v1/databases/:connectionId/schema
  * Get database schema information
  */
-router.get(
-  '/:connectionId/schema',
-  requirePermission('admin'),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
-    try {
-      const schemas = await databaseController.discoverSchema(
-        req.user!.id,
-        req.params.connectionId
-      );
+router.get('/:connectionId/schema', async (req: AuthenticatedRequest, res) => {
+  try {
+    const schemas = await databaseController.discoverSchema(req.user!.id, req.params.connectionId);
 
-      const response: ApiResponse<TableSchema[]> = {
-        success: true,
-        data: schemas,
-        meta: {
-          timestamp: new Date(),
-          requestId: req.get('X-Request-ID') || 'unknown',
-          version: process.env.npm_package_version || '0.3.0',
-        },
-      };
+    const response: ApiResponse<TableSchema[]> = {
+      success: true,
+      data: schemas,
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: process.env.npm_package_version || '0.3.0',
+      },
+    };
 
-      res.json(response);
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: {
-          code: 'SCHEMA_DISCOVERY_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to discover schema',
-        },
-      } as ApiResponse);
-    }
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'SCHEMA_DISCOVERY_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to discover schema',
+      },
+    } as ApiResponse);
   }
-);
+});
 
 /**
  * GET /api/v1/databases/status

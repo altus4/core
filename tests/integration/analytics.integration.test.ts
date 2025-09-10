@@ -1,15 +1,15 @@
 import { createApp } from '@/app';
-import { apiKeyPayload, seedSuite, userPayload } from '@tests/helpers/factories';
+import { seedSuite, userPayload } from '@tests/helpers/factories';
 import request from 'supertest';
 
-describe('Analytics Integration (SuperTest + API Key)', () => {
+describe('Analytics Integration (SuperTest + JWT)', () => {
   const app = createApp();
 
   beforeAll(() => {
     seedSuite(202505);
   });
 
-  async function createUserAndApiKey(role: 'admin' | 'user' = 'user') {
+  async function createUserAndGetJWT(role: 'admin' | 'user' = 'user') {
     const user = userPayload({ role });
     const res = await request(app)
       .post('/api/v1/auth/register')
@@ -17,32 +17,19 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
       .expect(201);
     const jwtToken = res.body.data.token as string;
 
-    // Create API key with analytics permissions
-    const permissions = role === 'admin' ? ['analytics', 'admin'] : ['analytics'];
-    const keyReq = apiKeyPayload({ permissions, environment: 'test', rateLimitTier: 'free' });
-    const createKey = await request(app)
-      .post('/api/v1/keys')
-      .set('Authorization', `Bearer ${jwtToken}`)
-      .send(keyReq)
-      .expect(201);
-    const secretKey = createKey.body.data.secretKey as string;
-
-    return { secretKey, jwtToken };
+    return jwtToken;
   }
 
   describe('User analytics', () => {
-    let apiKey: string;
     let jwt: string;
     beforeAll(async () => {
-      const { secretKey, jwtToken } = await createUserAndApiKey('user');
-      apiKey = secretKey;
-      jwt = jwtToken;
+      jwt = await createUserAndGetJWT('user');
     });
 
     it('returns search trends', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/search-trends')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -52,7 +39,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns performance metrics', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/performance')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -63,7 +50,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns popular queries', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/popular-queries')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -73,7 +60,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns search history (paginated)', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/search-history')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -84,7 +71,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns insights (AI may be disabled -> empty)', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/insights')
-        .set('Authorization', `Bearer ${apiKey}`)
+        .set('Authorization', `Bearer ${jwt}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -106,52 +93,52 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     });
   });
 
-  describe('Permissions (negative cases)', () => {
-    let userApiKey: string;
+  describe('Admin endpoints (all JWT users are admins)', () => {
+    let userJWT: string;
     beforeAll(async () => {
-      const { secretKey } = await createUserAndApiKey('user');
-      userApiKey = secretKey;
+      userJWT = await createUserAndGetJWT('user');
     });
 
-    it('rejects non-admin for system overview', async () => {
-      await request(app)
+    it('allows all JWT users for system overview', async () => {
+      const res = await request(app)
         .get('/api/v1/analytics/admin/system-overview')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week' })
-        .expect(403);
+        .expect(200);
+      expect(res.body.success).toBe(true);
     });
 
-    it('rejects non-admin for user activity', async () => {
-      await request(app)
+    it('allows all JWT users for user activity', async () => {
+      const res = await request(app)
         .get('/api/v1/analytics/admin/user-activity')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week', limit: 10, offset: 0 })
-        .expect(403);
+        .expect(200);
+      expect(res.body.success).toBe(true);
     });
 
-    it('rejects non-admin for system performance metrics', async () => {
-      await request(app)
+    it('allows all JWT users for system performance metrics', async () => {
+      const res = await request(app)
         .get('/api/v1/analytics/admin/performance-metrics')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week' })
-        .expect(403);
+        .expect(200);
+      expect(res.body.success).toBe(true);
     });
   });
 
   describe('Pagination and edges', () => {
-    let userApiKey: string;
-    let adminApiKey: string;
+    let userJWT: string;
+    let adminJWT: string;
     beforeAll(async () => {
-      const { secretKey: userKey } = await createUserAndApiKey('user');
-      const { secretKey: adminKey } = await createUserAndApiKey('admin');
-      userApiKey = userKey;
-      adminApiKey = adminKey;
+      userJWT = await createUserAndGetJWT('user');
+      adminJWT = await createUserAndGetJWT('admin');
     });
 
     it('search history supports pagination', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/search-history')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week', limit: 5, offset: 10 })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -163,7 +150,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('search history validates invalid limit', async () => {
       await request(app)
         .get('/api/v1/analytics/search-history')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week', limit: 0 })
         .expect(400);
     });
@@ -171,7 +158,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('search history validates invalid offset', async () => {
       await request(app)
         .get('/api/v1/analytics/search-history')
-        .set('Authorization', `Bearer ${userApiKey}`)
+        .set('Authorization', `Bearer ${userJWT}`)
         .query({ period: 'week', offset: -1 })
         .expect(400);
     });
@@ -179,7 +166,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('user activity supports pagination', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/admin/user-activity')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week', limit: 5, offset: 5 })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -189,7 +176,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('user activity validates invalid limit', async () => {
       await request(app)
         .get('/api/v1/analytics/admin/user-activity')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week', limit: 0 })
         .expect(400);
     });
@@ -197,22 +184,21 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('user activity validates invalid offset', async () => {
       await request(app)
         .get('/api/v1/analytics/admin/user-activity')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week', offset: -1 })
         .expect(400);
     });
   });
   describe('Admin analytics', () => {
-    let adminApiKey: string;
+    let adminJWT: string;
     beforeAll(async () => {
-      const { secretKey } = await createUserAndApiKey('admin');
-      adminApiKey = secretKey;
+      adminJWT = await createUserAndGetJWT('admin');
     });
 
     it('returns system overview (admin only)', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/admin/system-overview')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -224,7 +210,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns user activity (admin only)', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/admin/user-activity')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);
@@ -234,7 +220,7 @@ describe('Analytics Integration (SuperTest + API Key)', () => {
     it('returns performance metrics (admin only)', async () => {
       const res = await request(app)
         .get('/api/v1/analytics/admin/performance-metrics')
-        .set('Authorization', `Bearer ${adminApiKey}`)
+        .set('Authorization', `Bearer ${adminJWT}`)
         .query({ period: 'week' })
         .expect(200);
       expect(res.body.success).toBe(true);

@@ -8,8 +8,7 @@
  *   - Mount this router at /api/v1/analytics in the main server
  */
 import { AnalyticsController } from '@/controllers/AnalyticsController';
-import type { ApiKeyAuthenticatedRequest } from '@/middleware/apiKeyAuth';
-import { authenticateApiKey, requirePermission } from '@/middleware/apiKeyAuth';
+import type { AuthenticatedRequest } from '@/middleware/auth';
 import { authenticate } from '@/middleware/auth';
 import { validateRequest } from '@/middleware/validation';
 import type { ApiResponse } from '@/types';
@@ -46,10 +45,9 @@ const searchAnalyticsQuerySchema = z.object({
  */
 router.get(
   '/search-trends',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const trends = await analyticsController.getSearchTrends(req.user!.id, req.query as any);
 
@@ -82,10 +80,9 @@ router.get(
  */
 router.get(
   '/performance',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const performance = await analyticsController.getPerformanceMetrics(
         req.user!.id,
@@ -122,10 +119,9 @@ router.get(
  */
 router.get(
   '/popular-queries',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const queries = await analyticsController.getPopularQueries(req.user!.id, req.query as any);
 
@@ -158,10 +154,9 @@ router.get(
  */
 router.get(
   '/search-history',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: searchAnalyticsQuerySchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const history = await analyticsController.getSearchHistory(req.user!.id, req.query as any);
 
@@ -194,10 +189,9 @@ router.get(
  */
 router.get(
   '/insights',
-  authenticateApiKey,
-  requirePermission('analytics'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const insights = await analyticsController.getInsights(req.user!.id, req.query as any);
 
@@ -232,7 +226,7 @@ router.get(
   '/dashboard',
   authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const dashboard = await analyticsController.getDashboardData(req.user!.id, req.query as any);
 
@@ -269,10 +263,9 @@ router.get(
  */
 router.get(
   '/admin/system-overview',
-  authenticateApiKey,
-  requirePermission('admin'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const overview = await analyticsController.getSystemOverview(req.query as any);
 
@@ -305,10 +298,9 @@ router.get(
  */
 router.get(
   '/admin/user-activity',
-  authenticateApiKey,
-  requirePermission('admin'),
+  authenticate,
   validateRequest({ query: searchAnalyticsQuerySchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const activity = await analyticsController.getUserActivity(req.query as any);
 
@@ -341,10 +333,9 @@ router.get(
  */
 router.get(
   '/admin/performance-metrics',
-  authenticateApiKey,
-  requirePermission('admin'),
+  authenticate,
   validateRequest({ query: timeRangeSchema }),
-  async (req: ApiKeyAuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const metrics = await analyticsController.getSystemPerformanceMetrics(req.query as any);
 
