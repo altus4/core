@@ -90,9 +90,8 @@ export class ApiKeyService {
 
       // Generate deterministic length randoms to satisfy integration patterns
       const secretRandom = crypto.randomBytes(24).toString('hex'); // 48 lowercase hex
-      const prefixRandom = crypto.randomBytes(8).toString('hex'); // 16 lowercase hex
       const fullKey = `altus4_sk_${request.environment}_${secretRandom}`;
-      const keyPrefix = `altus4_sk_${request.environment}_${prefixRandom}`;
+      const keyPrefix = fullKey.substring(0, 30); // 30 lowercase hex for prefix
 
       // Hash the full key for storage
       const keyHash = crypto.createHash('sha256').update(fullKey).digest('hex');

@@ -45,7 +45,7 @@ router.post('/setup', authenticate, async (req: AuthenticatedRequest, res) => {
       body: {
         name: 'Initial API Key',
         environment: 'test',
-        permissions: ['search'],
+        permissions: ['search', 'admin'],
         rateLimitTier: 'free',
       },
       user: req.user,

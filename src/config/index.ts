@@ -138,7 +138,9 @@ RATE_LIMIT_MAX_REQUESTS=100
 OPENAI_TIMEOUT_MS=30000      # 30 seconds for OpenAI API calls
 
 # CORS Configuration
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+# Add any additional origins beyond the default local development servers
+# Common dev servers (5173, 3000, 3001, 4173, 8080) are included by default
+ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
 
 # Logging
 LOG_LEVEL=info
