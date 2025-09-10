@@ -137,6 +137,11 @@ export const authenticateApiKey = async (
  * Responds with 403 if API key doesn't have required permission.
  *
  * @param permission - Required permission (e.g., 'search', 'analytics', 'admin')
+ *
+ * @remarks
+ * The `permissions` property on the `ApiKey` object is expected to be an array of strings,
+ * e.g., ['search', 'analytics', 'admin']. The middleware checks for the presence of the required
+ * permission or 'admin' in this array.
  */
 export const requirePermission = (permission: string) => {
   return (req: ApiKeyAuthenticatedRequest, res: Response, next: NextFunction): void => {
@@ -151,7 +156,12 @@ export const requirePermission = (permission: string) => {
       return;
     }
 
-    if (!req.apiKey.permissions.includes(permission)) {
+    if ((req.apiKey.permissions ?? []).includes('admin')) {
+      next();
+      return;
+    }
+
+    if (!Array.isArray(req.apiKey.permissions) || !req.apiKey.permissions.includes(permission)) {
       res.status(403).json({
         success: false,
         error: {
@@ -159,7 +169,7 @@ export const requirePermission = (permission: string) => {
           message: `Permission '${permission}' required`,
           details: {
             required: permission,
-            available: req.apiKey.permissions,
+            available: req.apiKey?.permissions,
           },
         },
       } as ApiResponse);

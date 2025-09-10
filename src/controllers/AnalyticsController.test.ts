@@ -535,7 +535,7 @@ describe('AnalyticsController', () => {
 
         expect(result).toEqual(['recent query']);
         expect(mockConnection.execute).toHaveBeenCalledWith(
-          expect.stringContaining('SELECT DISTINCT query_text'),
+          expect.stringContaining('SELECT query_text'),
           expect.arrayContaining(['user-123'])
         );
       });

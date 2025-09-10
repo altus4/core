@@ -556,10 +556,11 @@ export class AnalyticsController {
       startDate.setDate(startDate.getDate() - days);
 
       const [queries] = await conn.execute<RowDataPacket[]>(
-        `SELECT DISTINCT query_text
+        `SELECT query_text
          FROM search_analytics
          WHERE user_id = ? AND created_at >= ?
-         ORDER BY created_at DESC
+         GROUP BY query_text
+         ORDER BY MAX(created_at) DESC
          LIMIT 50`,
         [userId, startDate]
       );
