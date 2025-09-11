@@ -1,29 +1,29 @@
 # Global ownership
-* @jerome
+* @Thavarshan
 
 # Core architecture and services
-/src/services/ @jerome
-/src/config/ @jerome
-/src/types/ @jerome
+/src/services/ @Thavarshan
+/src/config/ @Thavarshan
+/src/types/ @Thavarshan
 
 # Security-related files
-/src/middleware/auth.ts @jerome
-/src/middleware/security.ts @jerome
-/src/utils/encryption.ts @jerome
+/src/middleware/auth.ts @Thavarshan
+/src/middleware/security.ts @Thavarshan
+/src/utils/encryption.ts @Thavarshan
 
 # CI/CD and GitHub workflows
-/.github/ @jerome
+/.github/ @Thavarshan
 
 # Package management and dependencies
-/package.json @jerome
-/package-lock.json @jerome
+/package.json @Thavarshan
+/package-lock.json @Thavarshan
 
 # Configuration files
-/.env.example @jerome
-/tsconfig.json @jerome
-/jest.config.js @jerome
-/.eslintrc.json @jerome
+/.env.example @Thavarshan
+/tsconfig.json @Thavarshan
+/jest.config.js @Thavarshan
+/.eslintrc.json @Thavarshan
 
 # Documentation
-/CLAUDE.md @jerome
-/README.md @jerome
+/CLAUDE.md @Thavarshan
+/README.md @Thavarshan
