@@ -1,4 +1,4 @@
-# Altus 4
+# Altus 4 | API
 
 **AI-Enhanced MySQL Full-Text Search Engine**
 
