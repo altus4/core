@@ -128,6 +128,24 @@ Behavior notes:
 - You can override the migrations table name via `MIGRATIONS_TABLE` env (default `migrations`).
 - Seeds: place `.sql` files under `migrations/seeds/` to run them in filename order with `--seed`.
 
+### Developer & testing notes
+
+- The Node CLI (`src/cli/index.ts`) exports command helpers and is test-friendly: core functions are exported so tests can call commands like `cmdUpOne` and `cmdDownOneOrRollback` programmatically. To avoid starting the CLI during import, the CLI only executes `main()` when run directly (i.e. `node dist/src/cli/index.js` or via `./bin/altus`).
+- For integration tests the repository includes a mocked MySQL setup. Run the integration test suite which contains CLI tests with:
+
+```bash
+npm run test:integration
+```
+
+- If you want to test the CLI against a real MySQL instance, build the project and run the compiled CLI against your database:
+
+```bash
+npm run build
+./bin/altus migrate --path migrations
+```
+
+- Destructive operations (reset/fresh) are guarded in production; use `--force` together with `APP_ENV=production` only when you are certain.
+
 ### Environment Variables
 
 The migration CLI uses the same `.env` as the app:
@@ -881,14 +899,13 @@ All contributions go through code review:
 
 This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
-### MIT License Summary
+### Apache-2.0 Summary (not legal advice)
 
-- **Commercial use**: Permitted
-- **Modification**: Permitted
-- **Distribution**: Permitted
-- **Private use**: Permitted
-- **Liability**: Limited
-- **Warranty**: No warranty provided
+- Commercial use, modification, distribution, and private use are permitted.
+- You must include the LICENSE (and NOTICE, if provided) with any redistribution and state significant changes.
+- Includes a patent license from contributors; it terminates if you initiate patent litigation.
+- No trademark rights are granted.
+- Provided “AS IS” without warranties or conditions; liability is limited.
 
 ## Support
 
