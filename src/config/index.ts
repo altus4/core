@@ -1,4 +1,5 @@
 import type { AppConfig } from '@/types';
+import { getDatabaseConfig, getPort, getRedisConfig } from './heroku';
 
 const isTestEnvironment = process.env.NODE_ENV === 'test';
 
@@ -52,24 +53,18 @@ if (!isTestEnvironment) {
   });
 }
 
+// Get configurations that support Heroku add-ons
+const databaseConfig = getDatabaseConfig();
+const redisConfig = getRedisConfig();
+
 export const config: AppConfig = {
-  port: parseIntWithDefault(process.env.PORT, 3000),
+  port: getPort(),
   environment: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
   jwtSecret: process.env.JWT_SECRET!,
 
-  database: {
-    host: process.env.DB_HOST!,
-    port: parseIntWithDefault(process.env.DB_PORT, 3306),
-    username: process.env.DB_USERNAME!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.DB_DATABASE!,
-  },
+  database: databaseConfig,
 
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseIntWithDefault(process.env.REDIS_PORT, 6379),
-    password: process.env.REDIS_PASSWORD,
-  },
+  redis: redisConfig,
 
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',

@@ -1,0 +1,35 @@
+# Test files
+*.test.ts
+*.test.js
+tests/
+__tests__/
+
+# Development files
+.env
+.env.local
+.env.development
+*.log
+logs/
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Development dependencies that aren't needed in production
+bin/dev/
+bin/test/
+bin/security/
+
+# Source maps (optional - include if you want them in production for debugging)
+*.map

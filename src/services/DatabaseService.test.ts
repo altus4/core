@@ -59,7 +59,7 @@ describe('DatabaseService', () => {
       cleanup();
     });
 
-    it('should configure SSL when ssl is true', async () => {
+    it('should configure SSL based on environment (development)', async () => {
       const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
         connectionId: 'ssl-conn',
         skipConnectionSetup: true,
@@ -67,39 +67,49 @@ describe('DatabaseService', () => {
 
       const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
         id: 'ssl-conn',
-        ssl: true,
       });
 
       await service.addConnection(dbConfig);
 
+      // In test/development environment, SSL should not be configured
       expect(mocks.mysql.createPool).toHaveBeenCalledWith(
-        expect.objectContaining({
-          ssl: {},
+        expect.not.objectContaining({
+          ssl: expect.anything(),
         })
       );
 
       cleanup();
     });
 
-    it('should configure custom SSL string', async () => {
+    it('should configure SSL for production environment', async () => {
+      // Mock production environment by temporarily overriding the config environment
       const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
-        connectionId: 'custom-ssl-conn',
+        connectionId: 'production-ssl-conn',
         skipConnectionSetup: true,
       });
 
+      // Mock the getSSLConfig method to return production SSL config
+      const originalGetSSLConfig = (service as any).getSSLConfig;
+      (service as any).getSSLConfig = () => ({
+        rejectUnauthorized: false,
+      });
+
       const dbConfig = DatabaseTestUtils.createTestConnectionConfig({
-        id: 'custom-ssl-conn',
-        ssl: true,
+        id: 'production-ssl-conn',
       });
 
       await service.addConnection(dbConfig);
 
       expect(mocks.mysql.createPool).toHaveBeenCalledWith(
         expect.objectContaining({
-          ssl: {},
+          ssl: {
+            rejectUnauthorized: false,
+          },
         })
       );
 
+      // Restore original method
+      (service as any).getSSLConfig = originalGetSSLConfig;
       cleanup();
     });
 

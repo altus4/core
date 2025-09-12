@@ -1,0 +1,84 @@
+{
+  "name": "altus4-core",
+  "description": "AI-Enhanced MySQL Full-Text Search Engine",
+  "repository": "https://github.com/your-username/altus4",
+  "logo": "https://example.com/logo.png",
+  "keywords": ["search", "mysql", "ai", "fulltext", "api"],
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "Basic"
+    }
+  },
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment (production, development, test)",
+      "value": "production",
+      "required": true
+    },
+    "PORT": {
+      "description": "Port for the web server",
+      "value": "3000"
+    },
+    "JWT_SECRET": {
+      "description": "JWT secret key for authentication (minimum 32 characters)",
+      "generator": "secret",
+      "required": true
+    },
+    "DB_HOST": {
+      "description": "MySQL database host",
+      "required": true
+    },
+    "DB_PORT": {
+      "description": "MySQL database port",
+      "value": "3306"
+    },
+    "DB_USERNAME": {
+      "description": "MySQL database username",
+      "required": true
+    },
+    "DB_PASSWORD": {
+      "description": "MySQL database password",
+      "required": true
+    },
+    "DB_DATABASE": {
+      "description": "MySQL database name",
+      "required": true
+    },
+    "REDIS_HOST": {
+      "description": "Redis host for caching",
+      "required": true
+    },
+    "REDIS_PORT": {
+      "description": "Redis port",
+      "value": "6379"
+    },
+    "REDIS_PASSWORD": {
+      "description": "Redis password (if required)",
+      "required": false
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for AI features",
+      "required": true
+    }
+  },
+  "addons": [
+    {
+      "plan": "cleardb:ignite",
+      "as": "CLEARDB"
+    },
+    {
+      "plan": "heroku-redis:mini",
+      "as": "REDIS"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "npm run migrate:run"
+  }
+}

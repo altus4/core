@@ -47,7 +47,24 @@ export class DatabaseService {
     user: config.database.username,
     password: config.database.password,
     database: config.database.database,
+    ssl: this.getSSLConfig(),
+    connectTimeout: this.connectionTimeout,
   });
+
+  /**
+   * Get SSL configuration for database connections.
+   * Heroku/AWS RDS requires SSL for security.
+   */
+  private getSSLConfig() {
+    // In production (Heroku), we need SSL
+    if (config.environment === 'production') {
+      return {
+        rejectUnauthorized: false, // ClearDB uses self-signed certificates
+      };
+    }
+    // In development/test, SSL is typically not needed
+    return undefined;
+  }
 
   /**
    * Add a new database connection to the pool.
@@ -70,11 +87,10 @@ export class DatabaseService {
         reconnect: true,
       };
 
-      // Add SSL configuration if specified
-      if (dbConfig.ssl === true) {
-        poolConfig.ssl = {}; // Use empty object for MySQL SSL configuration
-      } else if (typeof dbConfig.ssl === 'string') {
-        poolConfig.ssl = {}; // Convert custom SSL string to empty object for MySQL
+      // Add SSL configuration
+      const sslConfig = this.getSSLConfig();
+      if (sslConfig) {
+        poolConfig.ssl = sslConfig;
       }
 
       // Create a new connection pool
@@ -140,14 +156,22 @@ export class DatabaseService {
             password = '';
           }
         }
-        pool = mysql.createPool({
+        const poolConfig: any = {
           host: row.host,
           port: row.port,
           user: row.username,
           password,
           database: row.database_name ?? row.database,
           connectionLimit: this.maxConnections,
-        });
+        };
+
+        // Add SSL configuration
+        const sslConfig = this.getSSLConfig();
+        if (sslConfig) {
+          poolConfig.ssl = sslConfig;
+        }
+
+        pool = mysql.createPool(poolConfig);
         this.connections.set(connectionId, pool);
       } catch (error) {
         logger.error(`Failed to hydrate connection for ${connectionId}:`, error);
