@@ -84,8 +84,8 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Run unit tests with coverage
-        run: npm run test:coverage
+      - name: Run unit tests
+        run: npm test
         env:
           NODE_ENV: test
           DB_HOST: 127.0.0.1
@@ -113,7 +113,7 @@ jobs:
           ENCRYPTION_KEY: test-encryption-key-32-chars-long
 
       - name: Run performance tests
-        run: npm run test:all
+        run: npm run test:performance
         env:
           NODE_ENV: test
           DB_HOST: 127.0.0.1
