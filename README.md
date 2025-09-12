@@ -86,6 +86,23 @@ npm run migrate:fresh
 npm run migrate          # equivalent to "up" (legacy alias)
 ```
 
+### Node-based CLI (no mysql client required)
+
+If your server doesn't have the `mysql` CLI installed, use the Node-based CLI which connects using `mysql2`:
+
+```bash
+# Build once (during deploy/build step)
+npm run build
+
+# Run commands via the Node CLI
+./bin/altus migrate
+./bin/altus migrate:status
+./bin/altus migrate:rollback --step 2
+./bin/altus migrate:fresh --force
+```
+
+See docs/CLI.md for the full reference.
+
 ### CLI Options
 
 ```bash

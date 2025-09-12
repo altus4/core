@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- No changes yet.
+### Added
+
+- JSDoc docblocks and inline comments for the migrations CLI (`src/cli/index.ts`) to improve developer understanding of flags, commands, and edge cases. This change is documentation-only and does not modify runtime behavior.
+
+### Quality
+
+- Verified TypeScript typecheck, ESLint linting, and Prettier formatting after the documentation updates (`npm run check`).
 
 ---
 

@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+// Altus4 CLI shim
+// Loads environment from .env and invokes compiled CLI
+
+const path = require('path');
+const fs = require('fs');
+
+// Load .env early if present
+try {
+  require('dotenv').config();
+} catch (e) {
+  // .env not found or dotenv not available; proceed without it.
+}
+
+// Prefer dist build location
+const distEntry = path.resolve(__dirname, '..', 'dist', 'src', 'cli', 'index.js');
+const altDist = path.resolve(__dirname, '..', 'dist', 'cli.js');
+let entry = distEntry;
+if (!fs.existsSync(entry) && fs.existsSync(altDist)) {
+  entry = altDist;
+}
+
+if (!fs.existsSync(entry)) {
+  console.error('Build output not found. Run `npm run build` first.');
+  process.exit(1);
+}
+
+require(entry);

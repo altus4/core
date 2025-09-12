@@ -1,3 +1,15 @@
-#!/bin/bash
-# Convenience script for database migrations
-exec "$(dirname "$0")/db/migrate.sh" "$@"
+#!/usr/bin/env bash
+# Deprecated migration shim. Prefer the Node CLI: `./bin/altus ...`
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "[DEPRECATION] 'bin/migrate' is deprecated. Use './bin/altus' instead." >&2
+echo "Forwarding to Node CLI..." >&2
+
+if [ -x "$ROOT_DIR/bin/altus" ]; then
+  exec "$ROOT_DIR/bin/altus" "$@"
+fi
+
+# Fallback to legacy bash implementation if Node CLI is unavailable
+exec "$ROOT_DIR/bin/db/migrate.sh" "$@"
