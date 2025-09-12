@@ -10,6 +10,8 @@
  */
 import { config } from '@/config';
 import winston from 'winston';
+import fs from 'fs';
+import path from 'path';
 
 const logLevel = process.env.LOG_LEVEL || 'info';
 
@@ -18,6 +20,25 @@ const logLevel = process.env.LOG_LEVEL || 'info';
  * Includes timestamp, error stack, JSON formatting, and colorization.
  * Logs to console in development and to files in production.
  */
+// Ensure logs directory exists BEFORE creating file transports to avoid
+// transport initialization failures in environments where the directory
+// is missing (e.g., fresh Heroku dynos).
+const enableFileLogs =
+  config.environment === 'production' && process.env.ENABLE_FILE_LOGS !== 'false';
+if (enableFileLogs) {
+  const logsDir = path.join(process.cwd(), 'logs');
+  try {
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+  } catch {
+    // If we cannot create the directory, disable file logging to prevent crash
+    // eslint-disable-next-line no-console
+    console.warn('[logger] Unable to create logs directory; disabling file transports.');
+    (process as any)._ALTUS_DISABLE_FILE_LOGS = true;
+  }
+}
+
 export const logger = winston.createLogger({
   level: logLevel,
   format: winston.format.combine(
@@ -44,7 +65,9 @@ export const logger = winston.createLogger({
     }),
 
     // File transport for production
-    ...(config.environment === 'production'
+    ...(config.environment === 'production' &&
+    !(process as any)._ALTUS_DISABLE_FILE_LOGS &&
+    enableFileLogs
       ? [
           new winston.transports.File({
             filename: 'logs/error.log',
@@ -61,14 +84,3 @@ export const logger = winston.createLogger({
       : []),
   ],
 });
-
-// Create logs directory if it doesn't exist in production
-if (config.environment === 'production') {
-  const fs = require('fs');
-  const path = require('path');
-
-  const logsDir = path.join(process.cwd(), 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
-}

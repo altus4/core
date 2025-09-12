@@ -167,6 +167,27 @@ function printPretendSql(source: 'file' | 'inline', value: string): void {
  * `canConnect` when needed.
  */
 function ensureDbConfig(flags: Flags): void {
+  const hasUrl =
+    !!process.env.CLEARDB_DATABASE_URL || !!process.env.JAWSDB_URL || !!process.env.DATABASE_URL;
+
+  if (hasUrl) {
+    return;
+  } // URL provides all needed credentials
+
+  // In production, be strict and require explicit variables.
+  if (isProduction()) {
+    const { DB_HOST } = process.env;
+    const DB_USER = process.env.DB_USERNAME;
+    const DB_NAME = flags.database || process.env.DB_DATABASE;
+    if (!DB_HOST || !DB_USER || !DB_NAME) {
+      die(
+        'Missing DB config. Set CLEARDB_DATABASE_URL/JAWSDB_URL/DATABASE_URL or DB_HOST, DB_USERNAME, DB_DATABASE.'
+      );
+    }
+    return;
+  }
+
+  // In development, fall back to sensible defaults to ease local setup.
   const DB_HOST = process.env.DB_HOST || 'localhost';
   const DB_USER = process.env.DB_USERNAME || 'root';
   const DB_NAME = flags.database || process.env.DB_DATABASE || 'altus4';
@@ -181,6 +202,35 @@ function ensureDbConfig(flags: Flags): void {
  * set (common in Docker/dev setups).
  */
 function poolFromEnv(flags: Flags): Pool {
+  // Prefer unified database URL if provided (Heroku add-ons)
+  const url =
+    process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL || process.env.DATABASE_URL;
+  if (url) {
+    try {
+      const u = new URL(url);
+      const host = u.hostname;
+      const port = Number(u.port || 3306);
+      const user = decodeURIComponent(u.username);
+      const password = decodeURIComponent(u.password);
+      const database = flags.database || u.pathname.replace(/^\//, '');
+      return createPool({
+        host,
+        port,
+        user,
+        password,
+        database,
+        waitForConnections: true,
+        connectionLimit: 5,
+        queueLimit: 0,
+        multipleStatements: true,
+        charset: 'utf8mb4_general_ci',
+      });
+    } catch (e) {
+      die(`Invalid database URL: ${String(e)}`);
+    }
+  }
+
+  // Socket or host-based connection
   const useSocket = !!process.env.DB_SOCKET;
   const host = process.env.DB_HOST || 'localhost';
   const port = Number(process.env.DB_PORT || 3306);

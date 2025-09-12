@@ -23,7 +23,9 @@ export const isValidEnvironment = (env: string): boolean => {
   return ['development', 'production', 'test'].includes(env);
 };
 
-const requiredEnvVars = ['JWT_SECRET', 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'] as const;
+// Base required vars; DB credentials are conditionally required depending on
+// whether a consolidated DATABASE URL is provided by the platform (e.g. Heroku).
+const BASE_REQUIRED_VARS = ['JWT_SECRET'] as const;
 
 // DB_PASSWORD can be empty for local development
 const optionalEnvVars = ['DB_PASSWORD'] as const;
@@ -40,7 +42,17 @@ if (isTestEnvironment) {
 
 // Validate required environment variables (skip in test mode or provide defaults)
 if (!isTestEnvironment) {
-  const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+  // If a single URL is provided by the hosting platform, we do not require
+  // the individual DB_HOST/DB_USERNAME/DB_DATABASE variables.
+  const hasDatabaseUrl = Boolean(
+    process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL || process.env.DATABASE_URL
+  );
+
+  const requiredVars = hasDatabaseUrl
+    ? [...BASE_REQUIRED_VARS]
+    : ([...BASE_REQUIRED_VARS, 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'] as const);
+
+  const missingVars = requiredVars.filter(envVar => !process.env[envVar]);
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
   }
