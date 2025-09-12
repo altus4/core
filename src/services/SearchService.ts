@@ -423,9 +423,15 @@ export class SearchService {
   }
 
   /**
-   * Generate cache key for search request
+   * Generate a unique cache key for a search request.
+   * Creates a deterministic key based on all search parameters to enable cache hits for identical requests.
+   * Sorts arrays to ensure consistent key generation regardless of parameter order.
+   *
+   * @param request - SearchRequest object containing all search parameters
+   * @returns Base64-encoded cache key string
    */
   private generateCacheKey(request: SearchRequest): string {
+    // Create a normalized object with sorted arrays for consistent hashing
     const key = {
       query: request.query,
       databases: request.databases?.sort(),
@@ -436,11 +442,17 @@ export class SearchService {
       offset: request.offset,
     };
 
+    // Use base64 encoding to create a URL-safe cache key
     return `search:${Buffer.from(JSON.stringify(key)).toString('base64')}`;
   }
 
   /**
-   * Extract matched columns from search result
+   * Extract matched columns from search result row.
+   * Analyzes row data to determine which columns contributed to the search match.
+   * Used for highlighting and relevance scoring.
+   *
+   * @param row - Database row result object
+   * @returns Array of column names that matched the search query
    */
   private extractMatchedColumns(row: any): string[] {
     const matchedColumns: string[] = [];
@@ -457,17 +469,28 @@ export class SearchService {
   }
 
   /**
-   * Sanitize row data for response
+   * Sanitize row data for API response.
+   * Removes internal database fields that shouldn't be exposed to clients.
+   *
+   * @param row - Raw database row result object
+   * @returns Sanitized row object without internal fields
    */
   private sanitizeRowData(row: any): Record<string, any> {
     const sanitized = { ...row };
+    // Remove internal fields used for search processing
     delete sanitized.table_name;
     delete sanitized.relevance_score;
     return sanitized;
   }
 
   /**
-   * Generate search result snippet
+   * Generate a contextual snippet from search results.
+   * Finds text fields containing search terms and creates a preview with highlighting context.
+   * Used to show relevant content snippets in search results.
+   *
+   * @param row - Database row result object
+   * @param query - Original search query string
+   * @returns Generated snippet string with context around matched terms
    */
   private generateSnippet(row: any, query: string): string {
     const searchTerms = query.toLowerCase().split(/\s+/);
