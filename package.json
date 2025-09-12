@@ -62,7 +62,7 @@
     "security:generate-jwt": "./bin/security/generate-jwt-secret.sh",
     "hooks:test": "./bin/test/test-hooks.sh",
     "pre-commit": "lint-staged && npm run validate && npm run build",
-    "prepare": "husky"
+    "prepare": "husky || echo 'husky not installed; skipping prepare'"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -109,8 +109,7 @@
     "ts-node": "^10.9.1",
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.1.6",
-    "uuid": "^9.0.0"
+    "typescript": "^5.1.6"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -124,6 +123,7 @@
     "openai": "^4.0.0",
     "rate-limiter-flexible": "^7.2.0",
     "winston": "^3.10.0",
-    "zod": "^3.21.4"
+    "zod": "^3.21.4",
+    "uuid": "^9.0.0"
   }
 }
