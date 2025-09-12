@@ -669,5 +669,35 @@ describe('AnalyticsController', () => {
         expect.any(Error)
       );
     });
+
+    it('should handle getPerformanceMetrics error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('Performance metrics failed'));
+
+      await expect(
+        analyticsController.getPerformanceMetrics('user-123', { period: 'week' })
+      ).rejects.toThrow('Performance metrics failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get performance metrics for user user-123:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle getSearchHistory error', async () => {
+      const { logger } = require('@/utils/logger');
+
+      mockConnection.execute.mockRejectedValue(new Error('Search history failed'));
+
+      await expect(
+        analyticsController.getSearchHistory('user-123', { limit: 10, offset: 0 })
+      ).rejects.toThrow('Search history failed');
+
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to get search history for user user-123:',
+        expect.any(Error)
+      );
+    });
   });
 });

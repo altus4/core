@@ -664,4 +664,43 @@ describe('DatabaseController', () => {
       });
     });
   });
+
+  describe('Error handling', () => {
+    it('should handle errors in getConnection', async () => {
+      const error = new Error('Database error');
+      mockConnection.execute.mockRejectedValue(error);
+
+      await expect(databaseController.getConnection('user-123', 'conn-123')).rejects.toThrow(
+        'Database error'
+      );
+    });
+
+    it('should handle errors in updateConnection', async () => {
+      const error = new Error('Update failed');
+      mockConnection.execute.mockRejectedValue(error);
+
+      const updateData = {
+        name: 'Updated Connection',
+        host: 'updated-host',
+        port: 3306,
+        database: 'updated_db',
+        username: 'updated_user',
+        password: 'updated_pass',
+        ssl: false,
+      };
+
+      await expect(
+        databaseController.updateConnection('user-123', 'conn-123', updateData)
+      ).rejects.toThrow('Update failed');
+    });
+
+    it('should handle errors in removeConnection', async () => {
+      const error = new Error('Remove failed');
+      mockConnection.execute.mockRejectedValue(error);
+
+      await expect(databaseController.removeConnection('user-123', 'conn-123')).rejects.toThrow(
+        'Remove failed'
+      );
+    });
+  });
 });

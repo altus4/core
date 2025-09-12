@@ -24,10 +24,11 @@ describe('AIService', () => {
     jest.clearAllMocks();
 
     // Mock OpenAIProxy instance
+    const mockCreate = jest.fn();
     mockOpenAIProxyInstance = {
       chat: {
         completions: {
-          create: jest.fn(),
+          create: mockCreate,
         },
       },
     } as any;
@@ -703,6 +704,137 @@ describe('AIService', () => {
       // Assert
       expect(insights).toEqual([]);
       expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI insights response');
+    });
+  });
+
+  describe('Error handling and edge cases', () => {
+    it('should handle JSON parse errors in getOptimizationSuggestions', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: 'invalid json response' } }],
+      } as any);
+
+      // Act
+      const result = await aiService.getOptimizationSuggestions('test query', 100, 5);
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI optimization response');
+    });
+
+    it('should handle JSON parse errors in analyzeQuery', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: 'invalid json response' } }],
+      } as any);
+
+      // Act
+      const result = await aiService.analyzeQuery('test query');
+
+      // Assert
+      expect(result).toEqual({ recommendations: [], optimizations: [] });
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI analysis response');
+    });
+
+    it('should handle empty response in getOptimizationSuggestions', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: null } }],
+      } as any);
+
+      // Act
+      const result = await aiService.getOptimizationSuggestions('test query', 100, 5);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty response in analyzeQuery', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: null } }],
+      } as any);
+
+      // Act
+      const result = await aiService.analyzeQuery('test query');
+
+      // Assert
+      expect(result).toEqual({ recommendations: [], optimizations: [] });
+    });
+
+    it('should handle empty response in generateInsights', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: null } }],
+      } as any);
+
+      // Act
+      const result = await aiService.generateInsights(['query1', 'query2'], 'week');
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle JSON parse errors in generateInsights', async () => {
+      // Arrange
+      aiService = new AIService();
+      (mockOpenAIProxyInstance.chat.completions.create as jest.Mock).mockResolvedValue({
+        choices: [{ message: { content: 'invalid json' } }],
+      } as any);
+
+      // Act
+      const result = await aiService.generateInsights(['query1', 'query2'], 'week');
+
+      // Assert
+      expect(result).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to parse AI insights response');
+    });
+
+    it('should return empty insights for empty queries array', async () => {
+      // Arrange
+      aiService = new AIService();
+
+      // Act
+      const result = await aiService.generateInsights([], 'week');
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle initialization errors gracefully', () => {
+      // Arrange
+      mockConfig.openai.apiKey = '';
+
+      // Act
+      aiService = new AIService();
+
+      // Assert
+      expect(aiService.isAvailable()).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'OpenAI API key not provided or invalid - AI features disabled'
+      );
+    });
+
+    it('should handle OpenAI proxy initialization errors', () => {
+      // Arrange
+      MockOpenAIProxy.mockImplementation(() => {
+        throw new Error('OpenAI initialization failed');
+      });
+
+      // Act
+      aiService = new AIService();
+
+      // Assert
+      expect(aiService.isAvailable()).toBe(false);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to initialize OpenAI service:',
+        expect.any(Error)
+      );
     });
   });
 });

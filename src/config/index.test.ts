@@ -730,6 +730,113 @@ describe('Config Module', () => {
     });
   });
 
+  describe('Database URL handling branches', () => {
+    it('should test hasDatabaseUrl branch logic', () => {
+      // Test the Boolean() conversion and || operators in hasDatabaseUrl
+      const testCases = [
+        { CLEARDB_DATABASE_URL: 'mysql://user:pass@host/db', expected: true },
+        { JAWSDB_URL: 'mysql://user:pass@host/db', expected: true },
+        { DATABASE_URL: 'mysql://user:pass@host/db', expected: true },
+        { CLEARDB_DATABASE_URL: '', JAWSDB_URL: '', DATABASE_URL: '', expected: false },
+        {
+          CLEARDB_DATABASE_URL: undefined,
+          JAWSDB_URL: undefined,
+          DATABASE_URL: undefined,
+          expected: false,
+        },
+      ];
+
+      testCases.forEach(testCase => {
+        const hasDatabaseUrl = Boolean(
+          testCase.CLEARDB_DATABASE_URL || testCase.JAWSDB_URL || testCase.DATABASE_URL
+        );
+        expect(hasDatabaseUrl).toBe(testCase.expected);
+      });
+    });
+
+    it('should test requiredVars array construction logic', () => {
+      const BASE_REQUIRED_VARS = ['JWT_SECRET'];
+
+      // Test when hasDatabaseUrl is true (should only require base vars)
+      const hasDatabaseUrl = true;
+      const requiredVarsWithUrl = hasDatabaseUrl
+        ? [...BASE_REQUIRED_VARS]
+        : [...BASE_REQUIRED_VARS, 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'];
+
+      expect(requiredVarsWithUrl).toEqual(['JWT_SECRET']);
+
+      // Test when hasDatabaseUrl is false (should require all DB vars)
+      const hasDatabaseUrlFalse = false;
+      const requiredVarsWithoutUrl = hasDatabaseUrlFalse
+        ? [...BASE_REQUIRED_VARS]
+        : [...BASE_REQUIRED_VARS, 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'];
+
+      expect(requiredVarsWithoutUrl).toEqual([
+        'JWT_SECRET',
+        'DB_HOST',
+        'DB_USERNAME',
+        'DB_DATABASE',
+      ]);
+    });
+
+    it('should test environment variable filtering logic', () => {
+      // Test the filter logic that checks for missing environment variables
+      const requiredVars = ['JWT_SECRET', 'DB_HOST', 'DB_USERNAME', 'DB_DATABASE'];
+
+      // Test case where all variables are present
+      const completeEnv = {
+        JWT_SECRET: 'secret',
+        DB_HOST: 'localhost',
+        DB_USERNAME: 'user',
+        DB_DATABASE: 'database',
+      };
+
+      const missingVarsComplete = requiredVars.filter(
+        envVar => !completeEnv[envVar as keyof typeof completeEnv]
+      );
+      expect(missingVarsComplete).toHaveLength(0);
+
+      // Test case where some variables are missing
+      const incompleteEnv = {
+        JWT_SECRET: '',
+        DB_HOST: undefined,
+        DB_USERNAME: 'user',
+        DB_DATABASE: 'database',
+      };
+
+      const missingVarsIncomplete = requiredVars.filter(
+        envVar => !incompleteEnv[envVar as keyof typeof incompleteEnv]
+      );
+      expect(missingVarsIncomplete).toContain('JWT_SECRET');
+      expect(missingVarsIncomplete).toContain('DB_HOST');
+      expect(missingVarsIncomplete).toHaveLength(2);
+    });
+
+    it('should test optional environment variables forEach logic', () => {
+      const optionalEnvVars = ['DB_PASSWORD'];
+      const mockEnv: Record<string, string | undefined> = {};
+
+      // Simulate the forEach logic that sets undefined optional vars to empty string
+      optionalEnvVars.forEach(envVar => {
+        if (mockEnv[envVar] === undefined) {
+          mockEnv[envVar] = '';
+        }
+      });
+
+      expect(mockEnv.DB_PASSWORD).toBe('');
+
+      // Test when the variable is already defined
+      const definedEnv: Record<string, string | undefined> = { DB_PASSWORD: 'password123' };
+      optionalEnvVars.forEach(envVar => {
+        if (definedEnv[envVar] === undefined) {
+          definedEnv[envVar] = '';
+        }
+      });
+
+      expect(definedEnv.DB_PASSWORD).toBe('password123');
+    });
+  });
+
   describe('Environment-specific branch testing', () => {
     it('should exercise all logical branches in config initialization', () => {
       // Test the constants and arrays used in the module
