@@ -67,7 +67,10 @@ export function createApp(): express.Application {
   }
 
   // Request parsing
-  app.use(express.json({ limit: '10mb' }));
+  // Allow JSON primitives (null/number/string/boolean) when clients send them
+  // by setting `strict: false`. The server still prefers objects/arrays but
+  // will not reject primitive JSON like `null` which some clients accidentally send.
+  app.use(express.json({ limit: '10mb', strict: false }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Logging and rate limiting (skip in tests for speed/noise)

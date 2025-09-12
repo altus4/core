@@ -43,6 +43,36 @@ export const errorHandler = (
   // eslint-disable-next-line no-unused-vars
   _next: NextFunction
 ): void => {
+  // If body-parser failed to parse JSON, return 400 (client error) with a clear message
+  if (
+    (error as any).type === 'entity.parse.failed' ||
+    (error instanceof SyntaxError && /JSON/.test((error as any).message))
+  ) {
+    const response: ApiResponse = {
+      success: false,
+      error: {
+        code: 'INVALID_JSON',
+        message: 'Request body contains invalid JSON',
+        ...(config.environment === 'development' && { details: (error as any).message }),
+      },
+      meta: {
+        timestamp: new Date(),
+        requestId: req.get('X-Request-ID') || 'unknown',
+        version: process.env.npm_package_version || '0.3.0',
+      },
+    };
+
+    logger.warn('Invalid JSON in request body', {
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+      message: (error as any).message,
+    });
+
+    res.status(400).json(response);
+    return;
+  }
+
   let statusCode = 500;
   let code = 'INTERNAL_ERROR';
   let message = 'Internal server error';
