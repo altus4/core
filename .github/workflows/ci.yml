@@ -113,7 +113,7 @@ jobs:
           ENCRYPTION_KEY: test-encryption-key-32-chars-long
 
       - name: Run performance tests
-        run: npm run test:performance
+        run: npm run test:all
         env:
           NODE_ENV: test
           DB_HOST: 127.0.0.1
@@ -125,15 +125,6 @@ jobs:
           REDIS_PORT: 6379
           JWT_SECRET: test-jwt-secret-for-ci
           ENCRYPTION_KEY: test-encryption-key-32-chars-long
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
 
   security:
     runs-on: ubuntu-latest
