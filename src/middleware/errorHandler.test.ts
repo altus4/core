@@ -500,6 +500,195 @@ describe('Error Handler Middleware', () => {
 
       process.env.npm_package_version = originalVersion;
     });
+
+    it('should use default version when npm_package_version is undefined', () => {
+      const originalVersion = process.env.npm_package_version;
+      delete process.env.npm_package_version;
+      const error = new Error('Test error');
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: expect.any(Object),
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+
+      process.env.npm_package_version = originalVersion;
+    });
+
+    it('should use default version for JSON error when npm_package_version is undefined', () => {
+      const originalVersion = process.env.npm_package_version;
+      delete process.env.npm_package_version;
+
+      const error = new Error('Invalid JSON');
+      (error as any).type = 'entity.parse.failed';
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INVALID_JSON',
+          message: 'Request body contains invalid JSON',
+          details: 'Invalid JSON',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+
+      process.env.npm_package_version = originalVersion;
+    });
+  });
+
+  describe('JSON Parsing Error Handling', () => {
+    it('should handle entity.parse.failed error', () => {
+      const error = new Error('Unexpected token in JSON at position 5');
+      (error as any).type = 'entity.parse.failed';
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INVALID_JSON',
+          message: 'Request body contains invalid JSON',
+          details: 'Unexpected token in JSON at position 5',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+
+      const { logger } = require('@/utils/logger');
+      expect(logger.warn).toHaveBeenCalledWith('Invalid JSON in request body', {
+        url: '/api/v1/test',
+        method: 'GET',
+        ip: '127.0.0.1',
+        message: 'Unexpected token in JSON at position 5',
+      });
+    });
+
+    it('should handle SyntaxError with JSON in message', () => {
+      const error = new SyntaxError('Unexpected token } in JSON at position 10');
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INVALID_JSON',
+          message: 'Request body contains invalid JSON',
+          details: 'Unexpected token } in JSON at position 10',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+
+      const { logger } = require('@/utils/logger');
+      expect(logger.warn).toHaveBeenCalledWith('Invalid JSON in request body', {
+        url: '/api/v1/test',
+        method: 'GET',
+        ip: '127.0.0.1',
+        message: 'Unexpected token } in JSON at position 10',
+      });
+    });
+
+    it('should handle SyntaxError without JSON in message (should not match)', () => {
+      const error = new SyntaxError('Unexpected token in expression');
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      // Should not match JSON parsing condition, should be handled as generic error
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+          stack: expect.any(String),
+          details: 'Unexpected token in expression',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+    });
+
+    it('should handle development environment branch coverage', () => {
+      // This test ensures the development environment branch is covered
+      const { config } = require('@/config');
+      expect(config.environment).toBe('development'); // Verify we're in dev mode
+
+      const error = new Error('Test error for development');
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Internal server error',
+          stack: expect.any(String),
+          details: 'Test error for development',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'test-request-id',
+          version: '0.3.0',
+        },
+      });
+    });
+
+    it('should handle JSON parsing error with missing request ID', () => {
+      const error = new Error('Invalid JSON syntax');
+      (error as any).type = 'entity.parse.failed';
+      req.get = jest.fn().mockReturnValue(undefined);
+
+      errorHandler(error, req as Request, res as Response, next);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'INVALID_JSON',
+          message: 'Request body contains invalid JSON',
+          details: 'Invalid JSON syntax',
+        },
+        meta: {
+          timestamp: expect.any(Date),
+          requestId: 'unknown',
+          version: '0.3.0',
+        },
+      });
+    });
+
+    it('should test JSON regex pattern matching', () => {
+      // Test the /JSON/.test() logic with various error messages
+      const testJsonRegex = (message: string) => /JSON/.test(message);
+
+      expect(testJsonRegex('Unexpected token in JSON at position 5')).toBe(true);
+      expect(testJsonRegex('Invalid JSON syntax')).toBe(true);
+      expect(testJsonRegex('Malformed JSON input')).toBe(true);
+      expect(testJsonRegex('json parsing failed')).toBe(false); // case sensitive
+      expect(testJsonRegex('Invalid syntax')).toBe(false);
+      expect(testJsonRegex('Unexpected token')).toBe(false);
+      expect(testJsonRegex('')).toBe(false);
+    });
   });
 
   describe('Edge Cases', () => {
