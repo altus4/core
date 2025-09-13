@@ -14,6 +14,7 @@ import { config } from '@/config';
 import type { ColumnInfo, DatabaseConnection, FullTextIndex, TableSchema } from '@/types';
 import { EncryptionUtil } from '@/utils/encryption';
 import { logger } from '@/utils/logger';
+import { escape, escapeId } from 'mysql2';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import mysql, { createConnection } from 'mysql2/promise';
 
@@ -137,7 +138,7 @@ export class DatabaseService {
         const conn = await this.metaConnection;
         const [rows] = await conn.execute<RowDataPacket[]>(
           `SELECT id, name, host, port, database_name, username,
-                  password, password_encrypted, ssl_enabled, is_active
+                  password, ssl_enabled, is_active
            FROM database_connections
            WHERE id = ? AND is_active = true`,
           [connectionId]
@@ -147,14 +148,12 @@ export class DatabaseService {
         }
         const row = rows[0] as any;
         let { password } = row;
-        if (!password && row.password_encrypted) {
-          try {
-            password = EncryptionUtil.decrypt(row.password_encrypted);
-          } catch (e) {
-            logger.error('Failed to decrypt stored database password:', e);
-            // fall back to empty to avoid crashing; queries will likely fail
-            password = '';
-          }
+        try {
+          password = EncryptionUtil.decrypt(row.password);
+        } catch (e) {
+          logger.error('Failed to decrypt stored database password:', e);
+          // fall back to empty to avoid crashing; queries will likely fail
+          password = '';
         }
         const poolConfig: any = {
           host: row.host,
@@ -218,12 +217,14 @@ export class DatabaseService {
         const tableName = Object.values(tableRow)[0] as string;
 
         // Get column information
-        const [columns] = await connection.execute<RowDataPacket[]>('DESCRIBE ??', [tableName]);
+        const [columns] = await connection.execute<RowDataPacket[]>(
+          `DESCRIBE ${escapeId(tableName)}`
+        );
 
         // Get full-text indexes
         const [indexes] = await connection.execute<RowDataPacket[]>(
-          'SHOW INDEX FROM ?? WHERE Index_type = ?',
-          [tableName, 'FULLTEXT']
+          `SHOW INDEX FROM ${escapeId(tableName)} WHERE Index_type = ?`,
+          ['FULLTEXT']
         );
 
         // Get estimated row count
@@ -272,17 +273,53 @@ export class DatabaseService {
 
     try {
       const searchQueries: string[] = [];
-      const searchParams: any[] = [];
+      const fallbackRows: RowDataPacket[] = [];
 
       for (const table of tables) {
         // Get full-text indexed columns for this table
         const [indexes] = await connection.execute<RowDataPacket[]>(
-          'SHOW INDEX FROM ?? WHERE Index_type = ?',
-          [table, 'FULLTEXT']
+          `SHOW INDEX FROM ${escapeId(table)} WHERE Index_type = ?`,
+          ['FULLTEXT']
         );
 
         if (indexes.length === 0) {
-          logger.warn(`No full-text indexes found for table: ${table}`);
+          logger.warn(
+            `No full-text indexes found for table: ${table}, falling back to LIKE search`
+          );
+
+          // Fallback: perform a parameterized LIKE search across the requested columns
+          const likeColumns =
+            columns && columns.length > 0 ? columns.map(col => escapeId(col)) : ['*'];
+
+          // If no specific columns provided, attempt to discover text-like columns
+          let fallbackColumns = likeColumns;
+          if (likeColumns.length === 1 && likeColumns[0] === '*') {
+            // Describe table to find candidate columns
+            const [cols] = await connection.execute<RowDataPacket[]>(`DESCRIBE ${escapeId(table)}`);
+            fallbackColumns = cols
+              .filter((c: any) => /char|text|varchar|blob|longtext|mediumtext/i.test(c.Type))
+              .map((c: any) => escapeId(c.Field));
+          }
+
+          if (fallbackColumns.length === 0) {
+            logger.warn(`No text-like columns found for fallback search on table: ${table}`);
+            continue;
+          }
+
+          // Build WHERE clauses with LIKE for each column
+          const likeClauses = fallbackColumns.map(col => `${col} LIKE ?`).join(' OR ');
+          const escapedTable = escapeId(table);
+          const sql = `SELECT ${escape(table)} as table_name, ${fallbackColumns.join(
+            ', '
+          )}, 0 as relevance_score FROM ${escapedTable} WHERE ${likeClauses} LIMIT ${Number(
+            limit
+          )} OFFSET ${Number(offset)}`;
+
+          const likeParam = `%${query}%`;
+          const params = [...Array(fallbackColumns.length).fill(likeParam)];
+
+          const [rows] = await connection.execute<RowDataPacket[]>(sql, params);
+          fallbackRows.push(...(rows as RowDataPacket[]));
           continue;
         }
 
@@ -298,24 +335,29 @@ export class DatabaseService {
             continue;
           }
 
-          const columnList = columnsToSearch.join(', ');
-          const selectColumns = columnsToSearch.map(col => `${col}`).join(', ');
+          // Escape column identifiers and table name to avoid SQL syntax errors
+          const columnList = columnsToSearch.map(col => escapeId(col)).join(', ');
+          const selectColumns = columnsToSearch.map(col => escapeId(col)).join(', ');
+          const escapedTable = escapeId(table);
 
+          const escapedQuery = escape(query);
           const searchQuery = `
             SELECT
-              '${table}' as table_name,
+              ${escape(table)} as table_name,
               ${selectColumns},
-              MATCH(${columnList}) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance_score
-            FROM ${table}
-            WHERE MATCH(${columnList}) AGAINST(? IN NATURAL LANGUAGE MODE)
+              MATCH(${columnList}) AGAINST(${escapedQuery} IN NATURAL LANGUAGE MODE) as relevance_score
+            FROM ${escapedTable}
+            WHERE MATCH(${columnList}) AGAINST(${escapedQuery} IN NATURAL LANGUAGE MODE)
           `;
 
           searchQueries.push(searchQuery);
-          searchParams.push(query, query);
         }
       }
 
       if (searchQueries.length === 0) {
+        if (fallbackRows.length > 0) {
+          return fallbackRows;
+        }
         return [];
       }
 
@@ -323,14 +365,17 @@ export class DatabaseService {
       const combinedQuery = `
         ${searchQueries.join(' UNION ALL ')}
         ORDER BY relevance_score DESC
-        LIMIT ? OFFSET ?
+        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
       `;
 
-      searchParams.push(limit, offset);
+      const [results] = await connection.execute<RowDataPacket[]>(combinedQuery);
 
-      const [results] = await connection.execute<RowDataPacket[]>(combinedQuery, searchParams);
+      const resultsArray = (results as RowDataPacket[]).slice();
+      if (fallbackRows.length > 0) {
+        resultsArray.push(...fallbackRows);
+      }
 
-      return results;
+      return resultsArray;
     } finally {
       connection.release();
     }
@@ -353,17 +398,20 @@ export class DatabaseService {
       for (const table of tables) {
         // Get full-text indexed columns
         const [indexes] = await connection.execute<RowDataPacket[]>(
-          'SHOW INDEX FROM ?? WHERE Index_type = ?',
-          [table, 'FULLTEXT']
+          `SHOW INDEX FROM ${escapeId(table)} WHERE Index_type = ?`,
+          ['FULLTEXT']
         );
 
         const columns = [...new Set(indexes.map(idx => idx.Column_name))];
 
         for (const column of columns) {
-          const [results] = await connection.execute<RowDataPacket[]>(
-            'SELECT DISTINCT ?? FROM ?? WHERE ?? LIKE ? LIMIT ?',
-            [column, table, column, `%${partialQuery}%`, limit]
-          );
+          const sql = `SELECT DISTINCT ${escapeId(column)} FROM ${escapeId(
+            table
+          )} WHERE ${escapeId(column)} LIKE ? LIMIT ?`;
+          const [results] = await connection.execute<RowDataPacket[]>(sql, [
+            `%${partialQuery}%`,
+            limit,
+          ]);
 
           results.forEach(row => {
             const value = row[column];

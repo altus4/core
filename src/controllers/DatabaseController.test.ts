@@ -456,7 +456,7 @@ describe('DatabaseController', () => {
       expect(mockDatabaseService.testConnection).toHaveBeenCalledWith('conn-123');
       expect(mockConnection.execute).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE database_connections SET last_tested'),
-        [expect.any(Date), 'active', 'conn-123', 'user-123']
+        [expect.any(Date), 'connected', 'conn-123', 'user-123']
       );
       expect(result).toEqual({
         connected: true,

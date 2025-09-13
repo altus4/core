@@ -334,7 +334,7 @@ export class DatabaseController {
       const conn = await this.connection;
       await conn.execute(
         'UPDATE database_connections SET last_tested = ?, connection_status = ? WHERE id = ? AND user_id = ?',
-        [new Date(), connected ? 'active' : 'error', connectionId, userId]
+        [new Date(), connected ? 'connected' : 'error', connectionId, userId]
       );
 
       return {

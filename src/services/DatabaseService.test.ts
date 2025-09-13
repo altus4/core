@@ -239,14 +239,20 @@ describe('DatabaseService', () => {
       const { service, mocks, cleanup } = DatabaseTestUtils.createIsolatedService({
         connectionId: 'no-indexes-db',
         mockResponses: {
-          executeResponses: [responses.empty], // No indexes found
+          executeResponses: [
+            responses.empty, // No indexes found
+            responses.columns, // DESCRIBE table query for fallback
+            responses.empty, // No results from LIKE search
+          ],
         },
       });
 
       const results = await service.executeFullTextSearch('no-indexes-db', 'test query', ['posts']);
 
       expect(results).toEqual([]);
-      expect(mockLogger.warn).toHaveBeenCalledWith('No full-text indexes found for table: posts');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'No full-text indexes found for table: posts, falling back to LIKE search'
+      );
       expect(mocks.connection.release).toHaveBeenCalled();
 
       cleanup();
@@ -437,8 +443,7 @@ describe('DatabaseService', () => {
               port: 3306,
               username: 'user',
               database_name: 'db',
-              password: null,
-              password_encrypted: 'invalid:tag:cipher',
+              password: 'invalid:tag:cipher',
               ssl_enabled: 0,
               is_active: 1,
             },
