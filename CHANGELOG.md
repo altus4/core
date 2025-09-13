@@ -15,9 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Verified TypeScript typecheck, ESLint linting, and Prettier formatting after the documentation updates (`npm run check`).
 
+### Changed
+
+- README: corrected repository path (`cd core`), prefer `npm ci`, and updated required npm version to 10+
+- README: standardized migration CLI usage to `./bin/altus` (deprecated `./bin/migrate` references removed)
+- README: fixed health checks section (removed non-existent `/health/db` and `/health/redis` endpoints; pointed to `/health`)
+- README: adjusted Docker notes to clarify no app Dockerfile is present; recommend `npm run dev:start|stop|reset` for local MySQL/Redis
+- README: updated link to CLI docs (`docs/cli.md`)
+- README: updated health response example version to `0.3.0`
+- Package metadata: set `license` to `Apache-2.0` to match LICENSE file
+- README: corrected authentication columns for `/api/v1/keys/*` and `/api/v1/databases/*` (require JWT for management endpoints)
+
+### Housekeeping
+
+- Relabeled the later `0.3.0` entry as `0.3.1` to resolve duplication.
+
 ---
 
-## [0.3.0] - 2025-09-09
+## [0.3.1] - 2025-09-09
 
 ### Added
 

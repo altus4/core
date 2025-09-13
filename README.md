@@ -29,7 +29,7 @@ Get Altus 4 running in 5 minutes:
 ```bash
 # Clone and install
 git clone https://github.com/altus4/core.git
-cd altus4 && npm install
+cd core && npm ci
 
 # Option 1: Full Docker Environment (Recommended)
 npm run dev:start        # Starts MySQL + Redis + runs migrations
@@ -79,8 +79,8 @@ npm run migrate:refresh
 npm run migrate:fresh
 
 # Run or rollback a specific file
-./bin/migrate migrate:up --file 001_create_users_table
-./bin/migrate migrate:down --file 001_create_users_table
+./bin/altus migrate:up --file 001_create_users_table
+./bin/altus migrate:down --file 001_create_users_table
 
 # Convenience alias retained for compatibility
 npm run migrate          # equivalent to "up" (legacy alias)
@@ -101,12 +101,12 @@ npm run build
 ./bin/altus migrate:fresh --force
 ```
 
-See docs/CLI.md for the full reference.
+See docs/cli.md for the full reference.
 
 ### CLI Options
 
 ```bash
-./bin/migrate <command> [options]
+./bin/altus <command> [options]
 
 --path <dir>       Directory of migrations (default: migrations)
 --database <name>  Override DB name (uses DB_DATABASE by default)
@@ -256,7 +256,7 @@ Before installing Altus 4, ensure you have the following dependencies:
 ### Required Software
 
 - **Node.js**: Version 20.0 or higher
-- **npm**: Version 8.0 or higher (or yarn/pnpm equivalent)
+- **npm**: Version 10.0 or higher (or yarn/pnpm equivalent)
 - **MySQL**: Version 8.0 or higher
 - **Redis**: Version 6.0 or higher
 
@@ -278,10 +278,10 @@ Before installing Altus 4, ensure you have the following dependencies:
 ```bash
 # Clone the repository
 git clone https://github.com/altus4/core.git
-cd altus4
+cd core
 
 # Install dependencies
-npm install
+npm ci
 
 # Copy environment configuration
 cp .env.example .env
@@ -430,7 +430,7 @@ Expected response:
 {
   "status": "healthy",
   "timestamp": "2024-01-15T10:30:00.000Z",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "uptime": 1234.567
 }
 ```
@@ -510,20 +510,20 @@ curl -X POST http://localhost:3000/api/v1/search \
 | POST   | `/api/v1/auth/register`    | Register new user    | None           |
 | POST   | `/api/v1/auth/login`       | User login           | None           |
 | POST   | `/api/v1/management/setup` | Create first API key | JWT Token      |
-| POST   | `/api/v1/keys`             | Create new API key   | API Key        |
-| GET    | `/api/v1/keys`             | List API keys        | API Key        |
-| DELETE | `/api/v1/keys/:id`         | Revoke API key       | API Key        |
+| POST   | `/api/v1/keys`             | Create new API key   | JWT Token      |
+| GET    | `/api/v1/keys`             | List API keys        | JWT Token      |
+| DELETE | `/api/v1/keys/:id`         | Revoke API key       | JWT Token      |
 
 ### Database Management Endpoints
 
 | Method | Endpoint                       | Description                | Authentication |
 | ------ | ------------------------------ | -------------------------- | -------------- |
-| GET    | `/api/v1/databases`            | List user databases        | API Key        |
-| POST   | `/api/v1/databases`            | Add database connection    | API Key        |
-| GET    | `/api/v1/databases/:id`        | Get database details       | API Key        |
-| PUT    | `/api/v1/databases/:id`        | Update database connection | API Key        |
-| DELETE | `/api/v1/databases/:id`        | Remove database connection | API Key        |
-| GET    | `/api/v1/databases/:id/schema` | Get database schema        | API Key        |
+| GET    | `/api/v1/databases`            | List user databases        | JWT Token      |
+| POST   | `/api/v1/databases`            | Add database connection    | JWT Token      |
+| GET    | `/api/v1/databases/:id`        | Get database details       | JWT Token      |
+| PUT    | `/api/v1/databases/:id`        | Update database connection | JWT Token      |
+| DELETE | `/api/v1/databases/:id`        | Remove database connection | JWT Token      |
+| GET    | `/api/v1/databases/:id/schema` | Get database schema        | JWT Token      |
 
 ### Search Endpoints
 
@@ -762,6 +762,10 @@ maxmemory-policy allkeys-lru
 
 ### Docker Deployment
 
+Note: An app Dockerfile is not included in this repository. The compose example
+below assumes you provide one. For local services (MySQL + Redis), prefer the
+built-in scripts: `npm run dev:start` / `npm run dev:stop` / `npm run dev:reset`.
+
 #### Docker Compose
 
 ```yaml
@@ -813,13 +817,10 @@ Configure health checks for production monitoring:
 ```bash
 # HTTP health check endpoint
 curl http://localhost:3000/health
-
-# Database connectivity check
-curl http://localhost:3000/health/db
-
-# Redis connectivity check
-curl http://localhost:3000/health/redis
 ```
+
+Note: Dedicated DB/Redis HTTP health endpoints are not exposed by the app. Use
+service/container healthchecks and application logs/metrics.
 
 ### Monitoring
 
@@ -841,30 +842,31 @@ We welcome contributions to Altus 4! Please follow these guidelines:
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally
 3. **Create a feature branch** from `main`
-4. **Install dependencies**: `npm install`
+4. **Install dependencies**: `npm ci`
 5. **Set up development environment** following the Installation guide
 
 ### Local Development with Docker
 
-For easy local development, we provide Docker-based scripts that automatically set up MySQL and Redis services:
+For easy local development, use the provided Docker-based scripts to start MySQL and Redis services:
 
 #### Quick Start (Recommended)
 
 ```bash
-# Start all services (MySQL + Redis) with automatic migrations
-./script/local/start.sh
+# Start services (MySQL + Redis) and run migrations
+npm run dev:start
 
 # Start the Node.js server
 npm run dev
+
+# Tail container logs
+npm run dev:logs
+
+# Stop services when done
+npm run dev:stop
+
+# Reset services and data (fresh start)
+npm run dev:reset
 ```
-
-#### Available Scripts
-
-| Script                    | Description                                               |
-| ------------------------- | --------------------------------------------------------- |
-| `./script/local/start.sh` | Start MySQL and Redis containers, run database migrations |
-| `./script/local/stop.sh`  | Stop all containers (data preserved)                      |
-| `./script/local/reset.sh` | Stop containers and remove all data (fresh start)         |
 
 ### Contribution Workflow
 
