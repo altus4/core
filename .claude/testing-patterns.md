@@ -308,7 +308,7 @@ export const searchFixtures = {
       name: 'Test Database',
       host: 'localhost',
       username: 'test_user',
-      password_encrypted: 'encrypted_password',
+      password: 'encrypted_password',
       database_name: 'test_db',
     },
   ],

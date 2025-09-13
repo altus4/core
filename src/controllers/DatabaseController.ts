@@ -265,7 +265,7 @@ export class DatabaseController {
       }
 
       if (updates.password) {
-        updateFields.push('password_encrypted = ?');
+        updateFields.push('password = ?');
         updateValues.push(EncryptionUtil.encrypt(updates.password));
       }
 

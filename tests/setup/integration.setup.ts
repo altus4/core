@@ -339,7 +339,6 @@ jest.mock('mysql2/promise', () => {
           database_name: databaseName,
           username,
           password: passwordEncrypted,
-          password_encrypted: passwordEncrypted,
           ssl_enabled: !!sslEnabled,
           is_active: isActive,
           created_at: createdAt || new Date(),
@@ -422,9 +421,8 @@ jest.mock('mysql2/promise', () => {
         if (query.includes('username = ?')) {
           c.username = params[idx++];
         }
-        if (query.includes('password_encrypted = ?')) {
+        if (query.includes('password = ?')) {
           const p = params[idx++];
-          c.password_encrypted = p;
           c.password = p;
         }
         if (query.includes('ssl_enabled = ?')) {
